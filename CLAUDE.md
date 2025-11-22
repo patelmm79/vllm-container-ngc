@@ -4,27 +4,41 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-This is a containerized vLLM inference server project that serves the Google Gemma 3.1B Instruct model. The project focuses on creating "pre-warmed" containers where the expensive model loading step is performed during the Docker build process rather than at runtime.
+This is a containerized vLLM inference server project that serves the Google Gemma 3.1B Instruct model. The project focuses on creating "pre-warmed" containers where the expensive model loading step is performed during the Docker build process rather than at runtime. The goal is to minimize cold start times for serverless deployments on Google Cloud Run.
 
 ## Architecture
 
-The project consists of three main components:
+The project consists of five main components:
 
-1. **Dockerfile**: Builds a container based on `vllm/vllm-openai:v0.9.0` that:
+1. **Dockerfile**: Builds a container based on `vllm/vllm-openai:latest` that:
    - Downloads the `google/gemma-3-1b-it` model during build time using a Hugging Face token
-   - Pre-warms the model by starting vLLM server, making a test request, then stopping it
-   - Includes comprehensive debug logging and timeout handling (300 second timeout with progress updates)
-   - Captures and displays vLLM server logs for troubleshooting
-   - Sets up the container to run offline (no Hugging Face Hub access at runtime)
+   - Configures the runtime environment to run offline (no Hugging Face Hub access)
+   - Sets up custom entrypoint for pre-warming when torch.compile is enabled
    - Serves the model via OpenAI-compatible API on port 8000
 
-2. **Cloud Build Configuration** (`cloudbuild.yaml`): Orchestrates the build process using:
-   - Google Cloud Build with `E2_HIGHCPU_8` machine type
-   - Docker buildx for advanced build features
-   - Secure injection of `HF_TOKEN` from Google Secret Manager
+2. **Runtime Entrypoint** (`entrypoint.sh` + `prewarm_compile.py`):
+   - `entrypoint.sh`: Custom startup script with comprehensive timing instrumentation
+   - Starts vLLM server in background and manages its lifecycle
+   - Conditionally runs pre-warming if `VLLM_TORCH_COMPILE_LEVEL > 0`
+   - `prewarm_compile.py`: Makes test requests with various input lengths (128, 256, 512, 1024, 2048 tokens) to populate torch.compile cache
+   - Keeps server running in foreground for normal operation
+
+3. **Cloud Build Pipeline** (`cloudbuild.yaml`): Multi-step CI/CD pipeline with:
+   - **Build step**: Uses Docker buildx with `E2_HIGHCPU_8` machine, securely injects `HF_TOKEN` from Secret Manager
+   - **Deploy step**: Automatically deploys to Cloud Run (`vllm-gemma-3-1b-it` service) with GPU configuration (8 CPU, 32Gi memory, 1x nvidia-l4)
+   - **Test step**: Installs dependencies and runs pytest tests against deployed service
    - Pushes to Google Artifact Registry at `us-central1-docker.pkg.dev/${PROJECT_ID}/vllm-gemma-3-1b-it-repo/vllm-gemma-3-1b-it`
 
-3. **Documentation**: `GEMINI.md` provides detailed build instructions and prerequisites
+4. **Testing Infrastructure**:
+   - `test_endpoint.py`: Pytest-based tests that verify `/v1/models` and `/v1/completions` endpoints
+   - `test_endpoint.sh`: Bash-based health check script (alternative to pytest)
+   - Tests retrieve Cloud Run service URL dynamically and verify model responsiveness
+   - `requirements-test.txt`: Test dependencies (pytest, requests)
+
+5. **Build Notification Handler** (`build-notification-handler/main.py`):
+   - Cloud Function that responds to Cloud Build Pub/Sub notifications
+   - Fetches logs for failed builds from Cloud Logging
+   - Prepared for integration with Gemini API for automated failure analysis (commented out)
 
 ## Build Commands
 
@@ -32,12 +46,26 @@ The project consists of three main components:
 ```bash
 # Build locally (requires HF_TOKEN environment variable)
 docker build --secret id=HF_TOKEN --tag vllm-gemma .
+
+# Run locally
+docker run -p 8000:8000 vllm-gemma
 ```
 
-### Production Build
+### Production Build and Deploy
 ```bash
-# Build using Google Cloud Build
+# Build, deploy to Cloud Run, and run tests (all automated via cloudbuild.yaml)
 gcloud builds submit --config cloudbuild.yaml
+```
+
+**Important**: Do NOT pass `HF_TOKEN` via `--substitutions`. The token is automatically injected from Secret Manager.
+
+### Testing
+```bash
+# Run tests locally (requires Cloud Run service to be deployed)
+pytest test_endpoint.py
+
+# Or use the bash script
+./test_endpoint.sh
 ```
 
 ## Key Environment Variables
@@ -59,14 +87,31 @@ gcloud builds submit --config cloudbuild.yaml
   - `2-3`: More aggressive optimization (longer compilation, higher throughput)
   - **Note**: For Cloud Run with auto-scaling, keeping this at `0` is recommended since torch.compile cache cannot persist across container instances
 - `SKIP_PREWARM`: Set to `1` to skip the runtime pre-warming phase (only relevant when `VLLM_TORCH_COMPILE_LEVEL > 0`)
+- `TORCH_DISTRIBUTED_DEBUG`: Set to `OFF` to suppress c10d warnings about destroy_process_group()
+- `OTEL_SDK_DISABLED`: Set to `true` to disable OpenTelemetry and prevent trace context warnings
 
 ## Runtime Configuration
 
 The container serves the model via vLLM's OpenAI-compatible API with these defaults:
 - Port: 8000 (configurable via `PORT` env var)
 - Model: `google/gemma-3-1b-it`
-- Data type: float32
+- Data type: float16 (configured in `entrypoint.sh`)
+- GPU memory utilization: 0.95
+- Max concurrent sequences: 8
 - Optional max model length via `MAX_MODEL_LEN`
+
+### Cloud Run Configuration (from `cloudbuild.yaml`)
+- Region: `us-central1`
+- CPU: 8 cores
+- Memory: 32Gi
+- GPU: 1x `nvidia-l4`
+- Execution environment: gen2
+- Timeout: 600s
+- Concurrency: 1 (one request per container instance)
+- Min instances: 1 (keeps at least one container warm)
+- Max instances: 10
+- CPU boost enabled for faster cold starts
+- Startup probe: HTTP health check on `/health` endpoint (60 attempts × 10s = 10 minute timeout)
 
 ## torch.compile Configuration
 
@@ -118,3 +163,59 @@ When `VLLM_TORCH_COMPILE_LEVEL > 0`, the container implements runtime pre-warmin
 - Hugging Face token is handled securely via Google Secret Manager
 - Container runs offline at runtime to prevent unauthorized Hub access
 - Model weights are cached during build to avoid runtime downloads
+
+## Development Workflow
+
+### Understanding the Two-Phase Startup
+
+The container has a unique two-phase startup design:
+
+1. **Build-time phase** (Dockerfile): Downloads model weights from Hugging Face Hub
+   - Model is cached in `/model-cache` (HF_HOME)
+   - Container is configured to run offline after build
+
+2. **Runtime phase** (entrypoint.sh): Starts vLLM server with optional pre-warming
+   - Sets system configurations (ulimit, hostname)
+   - Starts vLLM server in background
+   - Conditionally runs `prewarm_compile.py` if torch.compile is enabled
+   - Keeps server running in foreground with timing instrumentation
+
+### Modifying the Container
+
+When making changes to the container:
+
+- **Changing model loading**: Modify Dockerfile (build-time)
+- **Changing server startup**: Modify `entrypoint.sh` (runtime)
+- **Changing pre-warming behavior**: Modify `prewarm_compile.py` (runtime)
+- **Changing deployment config**: Modify `cloudbuild.yaml` deploy step
+
+### Local Testing
+
+For local testing without GPU:
+```bash
+# Build without GPU dependencies (will fail to run inference but good for testing build)
+docker build --secret id=HF_TOKEN --tag vllm-gemma .
+```
+
+For testing with GPU (requires NVIDIA Docker):
+```bash
+# Run with GPU
+docker run --gpus all -p 8000:8000 vllm-gemma
+```
+
+### Troubleshooting
+
+**Cold start too slow?**
+- Check `VLLM_TORCH_COMPILE_LEVEL` - should be `0` for fastest cold starts
+- Review `entrypoint.sh` timing logs to identify bottlenecks
+- Consider adjusting Cloud Run startup probe settings
+
+**Model not loading?**
+- Verify `HF_TOKEN` has access to `google/gemma-3-1b-it` model
+- Check build logs for download errors
+- Ensure sufficient disk space in build environment
+
+**Tests failing?**
+- Verify Cloud Run service name matches `SERVICE_NAME` in `test_endpoint.py`
+- Check that service is deployed and healthy before running tests
+- Review Cloud Run logs for server errors
