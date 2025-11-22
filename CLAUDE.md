@@ -4,14 +4,14 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-This is a containerized vLLM inference server project that serves the Google Gemma 3.1B Instruct model. The project focuses on creating "pre-warmed" containers where the expensive model loading step is performed during the Docker build process rather than at runtime. The goal is to minimize cold start times for serverless deployments on Google Cloud Run.
+This is a containerized vLLM inference server project that serves the DeepSeek-R1-Distill-Qwen-7B model (8B parameters). The project uses NVIDIA's NGC vLLM container and focuses on creating "pre-warmed" containers where the expensive model loading step is performed during the Docker build process rather than at runtime. The goal is to minimize cold start times for serverless deployments on Google Cloud Run.
 
 ## Architecture
 
 The project consists of five main components:
 
-1. **Dockerfile**: Builds a container based on `vllm/vllm-openai:latest` that:
-   - Downloads the `google/gemma-3-1b-it` model during build time using a Hugging Face token
+1. **Dockerfile**: Builds a container based on `nvcr.io/nvidia/vllm:25.10-py3` (NVIDIA NGC) that:
+   - Downloads the `deepseek-ai/DeepSeek-R1-Distill-Qwen-7B` model during build time using a Hugging Face token
    - Configures the runtime environment to run offline (no Hugging Face Hub access)
    - Sets up custom entrypoint for pre-warming when torch.compile is enabled
    - Serves the model via OpenAI-compatible API on port 8000
@@ -25,9 +25,9 @@ The project consists of five main components:
 
 3. **Cloud Build Pipeline** (`cloudbuild.yaml`): Multi-step CI/CD pipeline with:
    - **Build step**: Uses Docker buildx with `E2_HIGHCPU_8` machine, securely injects `HF_TOKEN` from Secret Manager
-   - **Deploy step**: Automatically deploys to Cloud Run (`vllm-gemma-3-1b-it` service) with GPU configuration (8 CPU, 32Gi memory, 1x nvidia-l4)
+   - **Deploy step**: Automatically deploys to Cloud Run (`vllm-deepseek-r1` service) with GPU configuration (8 CPU, 32Gi memory, 1x nvidia-l4)
    - **Test step**: Installs dependencies and runs pytest tests against deployed service
-   - Pushes to Google Artifact Registry at `us-central1-docker.pkg.dev/${PROJECT_ID}/vllm-gemma-3-1b-it-repo/vllm-gemma-3-1b-it`
+   - Pushes to Google Artifact Registry at `us-central1-docker.pkg.dev/${PROJECT_ID}/vllm-deepseek-r1-repo/vllm-deepseek-r1`
 
 4. **Testing Infrastructure**:
    - `test_endpoint.py`: Pytest-based tests that verify `/v1/models` and `/v1/completions` endpoints
@@ -70,7 +70,7 @@ pytest test_endpoint.py
 
 ## Key Environment Variables
 
-- `MODEL_NAME`: Set to `google/gemma-3-1b-it`
+- `MODEL_NAME`: Set to `deepseek-ai/DeepSeek-R1-Distill-Qwen-7B`
 - `HF_HOME`: Model cache directory (`/model-cache`)
 - `HF_TOKEN`: Required for downloading the model from Hugging Face
 - `HF_HUB_OFFLINE`: Set to `1` in final container to prevent runtime Hub access
@@ -94,7 +94,7 @@ pytest test_endpoint.py
 
 The container serves the model via vLLM's OpenAI-compatible API with these defaults:
 - Port: 8000 (configurable via `PORT` env var)
-- Model: `google/gemma-3-1b-it`
+- Model: `deepseek-ai/DeepSeek-R1-Distill-Qwen-7B` (8B parameters)
 - Data type: float16 (configured in `entrypoint.sh`)
 - GPU memory utilization: 0.95
 - Max concurrent sequences: 8
@@ -211,11 +211,11 @@ docker run --gpus all -p 8000:8000 vllm-gemma
 - Consider adjusting Cloud Run startup probe settings
 
 **Model not loading?**
-- Verify `HF_TOKEN` has access to `google/gemma-3-1b-it` model
+- Verify `HF_TOKEN` has access to `deepseek-ai/DeepSeek-R1-Distill-Qwen-7B` model
 - Check build logs for download errors
-- Ensure sufficient disk space in build environment
+- Ensure sufficient disk space in build environment (model is ~16GB in BF16)
 
 **Tests failing?**
-- Verify Cloud Run service name matches `SERVICE_NAME` in `test_endpoint.py`
+- Verify Cloud Run service name matches `SERVICE_NAME` in `test_endpoint.py` (should be `vllm-deepseek-r1`)
 - Check that service is deployed and healthy before running tests
 - Review Cloud Run logs for server errors

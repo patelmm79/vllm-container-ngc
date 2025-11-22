@@ -3,7 +3,7 @@
 # Exit immediately if a command exits with a non-zero status.
 set -e
 
-SERVICE_NAME="vllm-gemma-3-1b-it"
+SERVICE_NAME="vllm-deepseek-r1"
 REGION="us-central1"
 
 echo "--- Starting Post-Deployment Test ---"
@@ -40,8 +40,8 @@ else
     echo "Success: Endpoint returned status 200."
     RESPONSE_BODY=$(curl -s "$ENDPOINT_URL")
     echo "Response body: $RESPONSE_BODY"
-    if [[ "$RESPONSE_BODY" != *"gemma-3-1b-it"* ]]; then
-        echo "Error: Model name 'gemma-3-1b-it' not found in response."
+    if [[ "$RESPONSE_BODY" != *"DeepSeek-R1-Distill-Qwen-7B"* ]]; then
+        echo "Error: Model name 'DeepSeek-R1-Distill-Qwen-7B' not found in response."
         exit 1
     fi
     echo "Success: Model name found in response body."
@@ -53,7 +53,7 @@ echo "Testing completions endpoint: $COMPLETIONS_URL"
 
 read -r -d '' PAYLOAD << EOM
 {
-  "model": "gemma-3-1b-it",
+  "model": "DeepSeek-R1-Distill-Qwen-7B",
   "prompt": "What is the capital of France?",
   "max_tokens": 50,
   "temperature": 0.7

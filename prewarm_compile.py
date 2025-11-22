@@ -17,7 +17,7 @@ import requests
 from typing import List
 
 # Configuration
-MODEL_NAME = os.environ.get('MODEL_NAME', 'google/gemma-3-1b-it')
+MODEL_NAME = os.environ.get('MODEL_NAME', 'deepseek-ai/DeepSeek-R1-Distill-Qwen-7B')
 PORT = os.environ.get('PORT', '8000')
 BASE_URL = f"http://localhost:{PORT}"
 COMPLETIONS_ENDPOINT = f"{BASE_URL}/v1/completions"

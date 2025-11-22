@@ -1,4 +1,4 @@
-FROM vllm/vllm-openai:latest
+FROM nvcr.io/nvidia/vllm:25.10-py3
 
 # Accept TORCH_CUDA_ARCH_LIST as a build argument (defaults to 7.5 for T4 GPUs)
 ARG TORCH_CUDA_ARCH_LIST=7.5

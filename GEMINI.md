@@ -1,16 +1,16 @@
-# vLLM Gemma Container
+# vLLM NGC Container - DeepSeek-R1
 
-This project provides the configuration to build a Docker container for serving the Gemma 3.1B Instruct model using the vLLM inference server.
+This project provides the configuration to build a Docker container for serving the DeepSeek-R1-Distill-Qwen-7B model using NVIDIA's NGC vLLM container.
 
 ## Overview
 
-The primary goal is to package the vLLM server with the `gemma-3-1b-it` model into a container image that can be easily deployed. The build process is managed by Google Cloud Build.
+The primary goal is to package the NGC vLLM server with the `DeepSeek-R1-Distill-Qwen-7B` model (8B parameters) into a container image that can be easily deployed. The build process is managed by Google Cloud Build.
 
 ## Project Goals and Workflow
 
 ### Purpose
 
-The goal of this project is to containerize a small LLM (Gemma 3.1B Instruct) for the fastest possible inference, with a focus on minimizing cold start times. The primary issue being addressed is the slow initial response after periods of inactivity, which may be due to model loading.
+The goal of this project is to containerize DeepSeek-R1-Distill-Qwen-7B (8B parameters) using NVIDIA's NGC vLLM container for the fastest possible inference, with a focus on minimizing cold start times. The primary issue being addressed is the slow initial response after periods of inactivity, which is solved by performing model loading during the build process.
 
 ### Current Workflow (Manual)
 
@@ -31,7 +31,7 @@ The container is built using Google Cloud Build and the configuration is defined
 
 1.  A Google Cloud Project with the Cloud Build API and Secret Manager API enabled.
 2.  The `gcloud` CLI installed and authenticated.
-3.  A Hugging Face token with access to the Gemma model stored in Google Secret Manager. The secret must be named `HF_TOKEN`.
+3.  A Hugging Face token with access to the DeepSeek-R1 model stored in Google Secret Manager. The secret must be named `HF_TOKEN`.
 
 ### Build Command
 
@@ -50,5 +50,5 @@ The `cloudbuild.yaml` file defines the build steps:
 -   **Builder**: It uses the standard Docker builder from `gcr.io/cloud-builders/docker`.
 -   **Secrets**: It securely injects the `HF_TOKEN` from Secret Manager into the Docker build process. This is required to download the model from the Hugging Face Hub during the `docker build` command.
 -   **Image**: The final container image is tagged and pushed to Google Artifact Registry. The image path is defined by the `_IMAGE` substitution variable:
-    `us-central1-docker.pkg.dev/${PROJECT_ID}/vllm-gemma-3-1b-it-repo/vllm-gemma-3-1b-it`
--   **Machine Type**: The build is configured to run on a high-CPU machine (`E2_HIGHCPU_32`) to ensure the build process is fast and efficient.
+    `us-central1-docker.pkg.dev/${PROJECT_ID}/vllm-deepseek-r1-repo/vllm-deepseek-r1`
+-   **Machine Type**: The build is configured to run on a high-CPU machine (`E2_HIGHCPU_8`) to ensure the build process is fast and efficient.

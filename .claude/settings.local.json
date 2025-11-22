@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git add:*)",
+      "Bash(git commit -m \"$(cat <<''EOF''\nUpdate CLAUDE.md with comprehensive project documentation\n\nExpanded architecture section from 3 to 5 components:\n- Added detailed Runtime Entrypoint documentation (entrypoint.sh + prewarm_compile.py)\n- Added Testing Infrastructure section\n- Added Build Notification Handler component\n- Corrected Dockerfile base image reference (v0.9.0 → latest)\n\nEnhanced build and testing commands:\n- Added local Docker run command\n- Added pytest and bash script testing commands\n- Added HF_TOKEN security note\n\nCorrected and expanded runtime configuration:\n- Fixed data type (float32 → float16)\n- Added GPU memory utilization and max concurrent sequences\n- Added comprehensive Cloud Run configuration details\n\nAdded new environment variables:\n- TORCH_DISTRIBUTED_DEBUG (suppresses c10d warnings)\n- OTEL_SDK_DISABLED (prevents OpenTelemetry warnings)\n\nAdded new Development Workflow section:\n- Explained two-phase startup design (build-time vs runtime)\n- Guidance on where to make different types of changes\n- Local testing instructions with and without GPU\n- Troubleshooting guide for common issues\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nCo-Authored-By: Claude <noreply@anthropic.com>\nEOF\n)\")",
+      "Bash(git pull:*)",
+      "Bash(git push:*)",
+      "WebFetch(domain:catalog.ngc.nvidia.com)",
+      "Bash(git commit -m \"$(cat <<''EOF''\nMigrate to NGC container and DeepSeek-R1-Distill-Qwen-7B model\n\nMajor Changes:\n- Switched base container from vllm/vllm-openai:latest to nvcr.io/nvidia/vllm:25.10-py3 (NVIDIA NGC)\n- Migrated model from google/gemma-3-1b-it (3B) to deepseek-ai/DeepSeek-R1-Distill-Qwen-7B (8B parameters)\n- Updated Cloud Run service name from vllm-gemma-3-1b-it to vllm-deepseek-r1\n- Updated Artifact Registry path to vllm-deepseek-r1-repo/vllm-deepseek-r1\n\nUpdated Files:\n- Dockerfile: NGC container base image\n- entrypoint.sh: DeepSeek-R1 model default\n- prewarm_compile.py: Model reference update\n- cloudbuild.yaml: Service name and image repository\n- test_endpoint.py: Service name and model assertions\n- test_endpoint.sh: Service name and model checks\n- .env.example: Model configuration\n- CLAUDE.md: Comprehensive documentation updates\n- README.md: Project description and configuration\n- GEMINI.md: Build instructions\n\nNotes:\n- Model size increased from ~6GB to ~16GB (BF16 format)\n- L4 GPU (24GB VRAM) should handle 8B model comfortably\n- NGC container uses Python 3.12 and includes optimized GPU libraries\n- Requires new Artifact Registry repository: vllm-deepseek-r1-repo\n- HF_TOKEN must have access to DeepSeek-R1 model on Hugging Face\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nCo-Authored-By: Claude <noreply@anthropic.com>\nEOF\n)\")"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

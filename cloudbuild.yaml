@@ -24,7 +24,7 @@ steps:
   id: deploy
   entrypoint: 'gcloud'
   args: [
-    'run', 'deploy', 'vllm-gemma-3-1b-it',
+    'run', 'deploy', 'vllm-deepseek-r1',
     '--image', '${_IMAGE}',
     '--region', 'us-central1',
     '--platform', 'managed',
@@ -62,8 +62,8 @@ availableSecrets:
 
 images: ["${_IMAGE}"]
 
-substitutions:  
-  _IMAGE: 'us-central1-docker.pkg.dev/${PROJECT_ID}/vllm-gemma-3-1b-it-repo/vllm-gemma-3-1b-it'
+substitutions:
+  _IMAGE: 'us-central1-docker.pkg.dev/${PROJECT_ID}/vllm-deepseek-r1-repo/vllm-deepseek-r1'
 
 options:
   dynamicSubstitutions: true
