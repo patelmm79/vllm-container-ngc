@@ -1,6 +1,6 @@
 # vLLM NGC Container - DeepSeek-R1
 
-A containerized vLLM inference server using NVIDIA's NGC container that serves the DeepSeek-R1-Distill-Qwen-7B model (8B parameters) with optimized cold start performance through build-time model pre-warming.
+A containerized vLLM inference server using NVIDIA's NGC container that serves the DeepSeek-R1-Distill-Qwen-1.5B model (1.5B parameters) with optimized cold start performance through build-time model pre-warming.
 
 ## Overview
 
@@ -22,7 +22,7 @@ The project consists of three main components:
 ### 1. Dockerfile
 
 Builds a container based on `nvcr.io/nvidia/vllm:25.10-py3` (NVIDIA NGC) that:
-- Downloads the `deepseek-ai/DeepSeek-R1-Distill-Qwen-7B` model during build time using a Hugging Face token
+- Downloads the `deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B` model during build time using a Hugging Face token
 - Configures the container to run offline (no Hugging Face Hub access at runtime)
 - Sets up custom entrypoint for optional pre-warming when torch.compile is enabled
 - Serves the model via OpenAI-compatible API on port 8000
@@ -33,7 +33,7 @@ Builds a container based on `nvcr.io/nvidia/vllm:25.10-py3` (NVIDIA NGC) that:
 - Google Cloud Build with `E2_HIGHCPU_8` machine type
 - Docker buildx for advanced build features
 - Secure injection of `HF_TOKEN` from Google Secret Manager
-- Pushes to Google Artifact Registry at `us-central1-docker.pkg.dev/${PROJECT_ID}/vllm-deepseek-r1-repo/vllm-deepseek-r1`
+- Pushes to Google Artifact Registry at `us-central1-docker.pkg.dev/${PROJECT_ID}/vllm-deepseek-r1-repo/vllm-deepseek-r1-1.5b`
 
 ### 3. Documentation
 
@@ -68,7 +68,7 @@ gcloud builds submit --config cloudbuild.yaml
 
 ### Environment Variables
 
-- `MODEL_NAME`: Set to `deepseek-ai/DeepSeek-R1-Distill-Qwen-7B`
+- `MODEL_NAME`: Set to `deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B`
 - `HF_HOME`: Model cache directory (`/model-cache`)
 - `HF_TOKEN`: Required for downloading the model from Hugging Face (build time only)
 - `HF_HUB_OFFLINE`: Set to `1` in final container to prevent runtime Hub access
@@ -113,7 +113,7 @@ If you have **sustained, consistent traffic**, you can enable torch.compile for 
 
 The container serves the model via vLLM's OpenAI-compatible API with these defaults:
 - Port: 8000 (configurable via `PORT` env var)
-- Model: `deepseek-ai/DeepSeek-R1-Distill-Qwen-7B` (8B parameters)
+- Model: `deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B` (1.5B parameters)
 - Data type: float16
 - Optional max model length via `MAX_MODEL_LEN`
 
@@ -125,7 +125,7 @@ The container serves the model via vLLM's OpenAI-compatible API with these defau
 
 ## Project Goals
 
-The primary goal of this project is to containerize DeepSeek-R1-Distill-Qwen-7B (8B parameters) using NVIDIA's NGC vLLM container for the fastest possible inference, with a focus on minimizing cold start times. The main issue being addressed is the slow initial response after periods of inactivity, which is solved by performing model loading during the build process.
+The primary goal of this project is to containerize DeepSeek-R1-Distill-Qwen-1.5B (1.5B parameters) using NVIDIA's NGC vLLM container for the fastest possible inference, with a focus on minimizing cold start times. The main issue being addressed is the slow initial response after periods of inactivity, which is solved by performing model loading during the build process.
 
 ### Current Workflow (Manual)
 

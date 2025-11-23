@@ -43,7 +43,7 @@ log_timing "System configuration"
 # Use existing TORCH_CUDA_ARCH_LIST if set, otherwise default to 7.5 for T4 GPUs
 export TORCH_CUDA_ARCH_LIST="${TORCH_CUDA_ARCH_LIST:-7.5}"
 export HF_HUB_OFFLINE="${HF_HUB_OFFLINE:-1}"
-export MODEL_NAME="${MODEL_NAME:-deepseek-ai/DeepSeek-R1-Distill-Qwen-7B}"
+export MODEL_NAME="${MODEL_NAME:-deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B}"
 export PORT="${PORT:-8000}"
 
 echo "[Startup] Configuration:"

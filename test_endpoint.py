@@ -5,7 +5,7 @@ import time
 import subprocess
 import pytest
 
-SERVICE_NAME = "vllm-deepseek-r1"
+SERVICE_NAME = "vllm-deepseek-r1-1.5b"
 REGION = "us-central1"
 
 @pytest.fixture(scope="module")
@@ -54,7 +54,7 @@ def test_models_endpoint(service_url):
     print(f"Response body: {response_body}")
     assert "data" in response_body, "Response body does not contain 'data' key."
     model_ids = [model["id"] for model in response_body["data"]]
-    assert "DeepSeek-R1-Distill-Qwen-7B" in model_ids, "Model 'DeepSeek-R1-Distill-Qwen-7B' not found in response."
+    assert "DeepSeek-R1-Distill-Qwen-1.5B" in model_ids, "Model 'DeepSeek-R1-Distill-Qwen-1.5B' not found in response."
 
 def test_completions_endpoint(service_url):
     """
@@ -64,7 +64,7 @@ def test_completions_endpoint(service_url):
     print(f"Testing completions endpoint: {completions_url}")
 
     payload = {
-        "model": "DeepSeek-R1-Distill-Qwen-7B",
+        "model": "DeepSeek-R1-Distill-Qwen-1.5B",
         "prompt": "What is the capital of France?",
         "max_tokens": 50,
         "temperature": 0.7
