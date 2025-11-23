@@ -12,13 +12,13 @@ ENV TORCH_CUDA_ARCH_LIST="${TORCH_CUDA_ARCH_LIST}"
 ENV HF_HOME=/model-cache
 
 # Download model during build time (requires HF_TOKEN secret)
-# This ensures the model is cached in /model-cache before runtime
+# This ensures the model is cached in HF_HOME before runtime
 RUN --mount=type=secret,id=HF_TOKEN \
     export HF_TOKEN=$(cat /run/secrets/HF_TOKEN) && \
-    echo "Downloading model to /model-cache..." && \
-    python3 -c "from huggingface_hub import snapshot_download; print('Starting download...'); snapshot_download('deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B', cache_dir='/model-cache'); print('Download complete!')" && \
+    echo "Downloading model deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B..." && \
+    python3 -c "from huggingface_hub import snapshot_download; print('Starting download...'); path = snapshot_download('deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B'); print(f'Downloaded to: {path}')" && \
     echo "Verifying model cache..." && \
-    ls -lah /model-cache/ && \
+    ls -laR /model-cache/ && \
     echo "Model download successful!"
 
 # Set offline mode AFTER downloading the model
