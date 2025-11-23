@@ -45,8 +45,10 @@ steps:
     '--min-instances', '1',
     '--max-instances', '3',
     # Startup probe configuration (prevents routing requests before ready)
+    # Increased to 120 attempts × 10s = 20 minute timeout for model loading
+    # Using /v1/models endpoint as health check
     '--cpu-boost',
-    '--startup-probe', 'httpGet.path=/health,httpGet.port=8000,initialDelaySeconds=10,periodSeconds=10,timeoutSeconds=5,failureThreshold=60'
+    '--startup-probe', 'httpGet.path=/v1/models,httpGet.port=8000,initialDelaySeconds=30,periodSeconds=10,timeoutSeconds=10,failureThreshold=120'
   ]
 
 - name: 'python:3.9-slim'
