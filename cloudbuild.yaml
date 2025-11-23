@@ -19,9 +19,12 @@ steps:
           --secret id=HF_TOKEN,env=HF_TOKEN \
           --build-arg TORCH_CUDA_ARCH_LIST=7.5 \
           .
+        # Push the image to Artifact Registry
+        docker push ${_IMAGE}
 
 - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
   id: deploy
+  waitFor: ['build']
   entrypoint: 'gcloud'
   args: [
     'run', 'deploy', 'vllm-deepseek-r1',
@@ -48,11 +51,13 @@ steps:
 
 - name: 'python:3.9-slim'
   id: install-dependencies
+  waitFor: ['deploy']
   entrypoint: 'pip'
   args: ['install', '-r', 'requirements-test.txt']
 
 - name: 'python:3.9-slim'
   id: test
+  waitFor: ['install-dependencies']
   entrypoint: 'pytest'
   args: ['test_endpoint.py']
 
