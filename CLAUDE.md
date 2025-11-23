@@ -25,9 +25,9 @@ The project consists of five main components:
 
 3. **Cloud Build Pipeline** (`cloudbuild.yaml`): Multi-step CI/CD pipeline with:
    - **Build step**: Uses Docker buildx with `E2_HIGHCPU_8` machine, securely injects `HF_TOKEN` from Secret Manager
-   - **Deploy step**: Automatically deploys to Cloud Run (`vllm-deepseek-r1-1.5b` service) with GPU configuration (8 CPU, 32Gi memory, 1x nvidia-l4)
+   - **Deploy step**: Automatically deploys to Cloud Run (`vllm-deepseek-r1-1-5b` service) with GPU configuration (8 CPU, 32Gi memory, 1x nvidia-l4)
    - **Test step**: Installs dependencies and runs pytest tests against deployed service
-   - Pushes to Google Artifact Registry at `us-central1-docker.pkg.dev/${PROJECT_ID}/vllm-deepseek-r1-repo/vllm-deepseek-r1-1.5b`
+   - Pushes to Google Artifact Registry at `us-central1-docker.pkg.dev/${PROJECT_ID}/vllm-deepseek-r1-repo/vllm-deepseek-r1-1-5b`
 
 4. **Testing Infrastructure**:
    - `test_endpoint.py`: Pytest-based tests that verify `/v1/models` and `/v1/completions` endpoints
@@ -216,6 +216,6 @@ docker run --gpus all -p 8000:8000 vllm-gemma
 - Ensure sufficient disk space in build environment (model is ~3GB in BF16)
 
 **Tests failing?**
-- Verify Cloud Run service name matches `SERVICE_NAME` in `test_endpoint.py` (should be `vllm-deepseek-r1-1.5b`)
+- Verify Cloud Run service name matches `SERVICE_NAME` in `test_endpoint.py` (should be `vllm-deepseek-r1-1-5b`)
 - Check that service is deployed and healthy before running tests
 - Review Cloud Run logs for server errors

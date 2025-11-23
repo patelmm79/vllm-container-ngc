@@ -3,7 +3,7 @@
 # Exit immediately if a command exits with a non-zero status.
 set -e
 
-SERVICE_NAME="vllm-deepseek-r1-1.5b"
+SERVICE_NAME="vllm-deepseek-r1-1-5b"
 REGION="us-central1"
 
 echo "--- Starting Post-Deployment Test ---"

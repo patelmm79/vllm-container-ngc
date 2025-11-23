@@ -50,5 +50,5 @@ The `cloudbuild.yaml` file defines the build steps:
 -   **Builder**: It uses the standard Docker builder from `gcr.io/cloud-builders/docker`.
 -   **Secrets**: It securely injects the `HF_TOKEN` from Secret Manager into the Docker build process. This is required to download the model from the Hugging Face Hub during the `docker build` command.
 -   **Image**: The final container image is tagged and pushed to Google Artifact Registry. The image path is defined by the `_IMAGE` substitution variable:
-    `us-central1-docker.pkg.dev/${PROJECT_ID}/vllm-deepseek-r1-repo/vllm-deepseek-r1-1.5b`
+    `us-central1-docker.pkg.dev/${PROJECT_ID}/vllm-deepseek-r1-repo/vllm-deepseek-r1-1-5b`
 -   **Machine Type**: The build is configured to run on a high-CPU machine (`E2_HIGHCPU_8`) to ensure the build process is fast and efficient.

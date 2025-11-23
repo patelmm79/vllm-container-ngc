@@ -33,7 +33,7 @@ Builds a container based on `nvcr.io/nvidia/vllm:25.10-py3` (NVIDIA NGC) that:
 - Google Cloud Build with `E2_HIGHCPU_8` machine type
 - Docker buildx for advanced build features
 - Secure injection of `HF_TOKEN` from Google Secret Manager
-- Pushes to Google Artifact Registry at `us-central1-docker.pkg.dev/${PROJECT_ID}/vllm-deepseek-r1-repo/vllm-deepseek-r1-1.5b`
+- Pushes to Google Artifact Registry at `us-central1-docker.pkg.dev/${PROJECT_ID}/vllm-deepseek-r1-repo/vllm-deepseek-r1-1-5b`
 
 ### 3. Documentation
 

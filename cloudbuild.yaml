@@ -27,7 +27,7 @@ steps:
   waitFor: ['build']
   entrypoint: 'gcloud'
   args: [
-    'run', 'deploy', 'vllm-deepseek-r1-1.5b',
+    'run', 'deploy', 'vllm-deepseek-r1-1-5b',
     '--image', '${_IMAGE}',
     '--region', 'us-central1',
     '--platform', 'managed',
@@ -69,7 +69,7 @@ availableSecrets:
 images: ["${_IMAGE}"]
 
 substitutions:
-  _IMAGE: 'us-central1-docker.pkg.dev/${PROJECT_ID}/vllm-deepseek-r1-repo/vllm-deepseek-r1-1.5b'
+  _IMAGE: 'us-central1-docker.pkg.dev/${PROJECT_ID}/vllm-deepseek-r1-repo/vllm-deepseek-r1-1-5b'
 
 options:
   dynamicSubstitutions: true

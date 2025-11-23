@@ -5,7 +5,7 @@ import time
 import subprocess
 import pytest
 
-SERVICE_NAME = "vllm-deepseek-r1-1.5b"
+SERVICE_NAME = "vllm-deepseek-r1-1-5b"
 REGION = "us-central1"
 
 @pytest.fixture(scope="module")
