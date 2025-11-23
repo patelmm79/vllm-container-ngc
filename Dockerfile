@@ -14,8 +14,12 @@ ENV HF_HOME=/model-cache
 # Download model during build time (requires HF_TOKEN secret)
 # This ensures the model is cached in /model-cache before runtime
 RUN --mount=type=secret,id=HF_TOKEN \
-    HF_TOKEN=$(cat /run/secrets/HF_TOKEN) \
-    python3 -c "from huggingface_hub import snapshot_download; snapshot_download('deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B', cache_dir='/model-cache')"
+    export HF_TOKEN=$(cat /run/secrets/HF_TOKEN) && \
+    echo "Downloading model to /model-cache..." && \
+    python3 -c "from huggingface_hub import snapshot_download; print('Starting download...'); snapshot_download('deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B', cache_dir='/model-cache'); print('Download complete!')" && \
+    echo "Verifying model cache..." && \
+    ls -lah /model-cache/ && \
+    echo "Model download successful!"
 
 # Set offline mode AFTER downloading the model
 # This prevents runtime access to Hugging Face Hub
