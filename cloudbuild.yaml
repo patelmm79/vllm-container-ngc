@@ -40,7 +40,7 @@ steps:
     '--timeout', '600',
     '--concurrency', '1',
     '--min-instances', '1',
-    '--max-instances', '10',
+    '--max-instances', '3',
     # Startup probe configuration (prevents routing requests before ready)
     '--cpu-boost',
     '--startup-probe', 'httpGet.path=/health,httpGet.port=8000,initialDelaySeconds=10,periodSeconds=10,timeoutSeconds=5,failureThreshold=60'
