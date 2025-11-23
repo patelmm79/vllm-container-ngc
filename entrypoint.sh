@@ -33,10 +33,10 @@ log_timing "Container initialization"
 
 # Apply system configurations
 echo "[Startup] Setting file descriptor limit..."
-ulimit -n 1048576
+ulimit -n 1048576 2>/dev/null || echo "[Startup] Warning: Could not set ulimit (not permitted in this environment)"
 
 echo "[Startup] Adding hostname to /etc/hosts..."
-echo "127.0.0.1 $(hostname)" >> /etc/hosts
+echo "127.0.0.1 $(hostname)" >> /etc/hosts 2>/dev/null || echo "[Startup] Warning: Could not modify /etc/hosts"
 log_timing "System configuration"
 
 # Export environment variables that should be inherited by child processes
