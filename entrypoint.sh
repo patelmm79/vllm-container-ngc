@@ -43,7 +43,27 @@ log_timing "System configuration"
 # Use existing TORCH_CUDA_ARCH_LIST if set, otherwise default to 7.5 for T4 GPUs
 export TORCH_CUDA_ARCH_LIST="${TORCH_CUDA_ARCH_LIST:-7.5}"
 export HF_HUB_OFFLINE="${HF_HUB_OFFLINE:-1}"
-export MODEL_NAME="${MODEL_NAME:-deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B}"
+
+# Resolve the model path from the cache
+# When offline, we need to point to the actual cached directory
+export MODEL_REPO="${MODEL_REPO:-deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B}"
+
+# Find the snapshot directory in the HF cache
+if [ -d "${HF_HOME}/models--deepseek-ai--DeepSeek-R1-Distill-Qwen-1.5B" ]; then
+    # Get the actual snapshot path (there should be only one)
+    SNAPSHOT_DIR=$(find ${HF_HOME}/models--deepseek-ai--DeepSeek-R1-Distill-Qwen-1.5B/snapshots -maxdepth 1 -type d | tail -n 1)
+    if [ -n "$SNAPSHOT_DIR" ]; then
+        export MODEL_NAME="$SNAPSHOT_DIR"
+        echo "[Startup] Using cached model at: $MODEL_NAME"
+    else
+        export MODEL_NAME="${MODEL_REPO}"
+        echo "[Startup] Warning: Could not find snapshot directory, using repo name: $MODEL_NAME"
+    fi
+else
+    export MODEL_NAME="${MODEL_REPO}"
+    echo "[Startup] Warning: Model cache not found, using repo name: $MODEL_NAME"
+fi
+
 export PORT="${PORT:-8000}"
 
 echo "[Startup] Configuration:"
