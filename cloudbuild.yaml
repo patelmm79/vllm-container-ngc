@@ -67,5 +67,6 @@ substitutions:
 
 options:
   dynamicSubstitutions: true
-  machineType: "E2_HIGHCPU_8"
+  machineType: "E2_HIGHCPU_32"
+  diskSizeGb: 200
   logging: CLOUD_LOGGING_ONLY
