@@ -11,17 +11,18 @@ set -e  # Exit on error
 # ============================================================================
 # TIMING INSTRUMENTATION - Cold Start Profiling
 # ============================================================================
-# Record start time for overall cold start measurement
-COLD_START_BEGIN=$(date +%s.%N)
+# Record start time for overall cold start measurement (in milliseconds)
+COLD_START_BEGIN=$(date +%s%3N)
 STAGE_START=$COLD_START_BEGIN
 
 # Function to log timing for each stage
 log_timing() {
     local stage_name="$1"
-    local current_time=$(date +%s.%N)
-    local stage_duration=$(echo "$current_time - $STAGE_START" | bc)
-    local total_elapsed=$(echo "$current_time - $COLD_START_BEGIN" | bc)
-    printf "[TIMING] %-40s %8.2fs (total: %8.2fs)\n" "$stage_name" "$stage_duration" "$total_elapsed"
+    local current_time=$(date +%s%3N)  # milliseconds
+    local stage_duration=$(( (current_time - STAGE_START) ))
+    local total_elapsed=$(( (current_time - COLD_START_BEGIN) ))
+    # Convert milliseconds to seconds with 2 decimal places
+    printf "[TIMING] %-40s %8.2fs (total: %8.2fs)\n" "$stage_name" "$(awk "BEGIN {printf \"%.2f\", $stage_duration/1000}")" "$(awk "BEGIN {printf \"%.2f\", $total_elapsed/1000}")"
     STAGE_START=$current_time
 }
 
@@ -112,8 +113,8 @@ echo ""
 echo "========================================="
 echo "COLD START TIMING SUMMARY"
 echo "========================================="
-TOTAL_COLD_START=$(echo "$(date +%s.%N) - $COLD_START_BEGIN" | bc)
-printf "Total cold start time: %.2f seconds\n" "$TOTAL_COLD_START"
+TOTAL_COLD_START=$(( $(date +%s%3N) - COLD_START_BEGIN ))
+printf "Total cold start time: %.2f seconds\n" "$(awk "BEGIN {printf \"%.2f\", $TOTAL_COLD_START/1000}")"
 echo "========================================="
 echo ""
 
