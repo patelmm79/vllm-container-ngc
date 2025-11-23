@@ -35,6 +35,8 @@ steps:
     '--memory', '32Gi',
     '--gpu', '1',
     '--gpu-type', 'nvidia-l4',
+    '--no-cpu-throttling',
+    '--no-default-locality',
     # Performance and scaling configuration
     '--timeout', '600',
     '--concurrency', '1',
