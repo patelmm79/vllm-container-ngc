@@ -45,11 +45,10 @@ steps:
     '--max-instances', '3',
     # Startup probe configuration (prevents routing requests before ready)
     # 30 attempts × 10s = 5 minute timeout for model loading
-    # Using /v1/models endpoint as health check
+    # Using /health endpoint (available immediately after server starts)
     '--cpu-boost',
-    '--startup-probe', 'httpGet.path=/v1/models,httpGet.port=8000,initialDelaySeconds=30,periodSeconds=10,timeoutSeconds=10,failureThreshold=30',
-    # Set PORT explicitly to avoid Cloud Run's default 8080
-    '--set-env-vars', 'PORT=8000'
+    '--port', '8080',
+    '--startup-probe', 'httpGet.path=/health,httpGet.port=8080,initialDelaySeconds=30,periodSeconds=10,timeoutSeconds=10,failureThreshold=30'
   ]
 
 - name: 'python:3.9-slim'
