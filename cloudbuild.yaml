@@ -31,7 +31,6 @@ steps:
     '--image', '${_IMAGE}',
     '--region', 'us-central1',
     '--platform', 'managed',
-    '--allow-unauthenticated',
     '--execution-environment', 'gen2',
     # Resource allocation for GPU workloads
     '--cpu', '8',
