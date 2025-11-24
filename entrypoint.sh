@@ -64,7 +64,8 @@ else
     echo "[Startup] Warning: Model cache not found, using repo name: $MODEL_NAME"
 fi
 
-export PORT="${PORT:-8000}"
+# Force port 8000 (Cloud Run sets PORT=8080 by default, but we configure probes for 8000)
+export PORT="8000"
 
 echo "[Startup] Configuration:"
 echo "  MODEL_NAME: $MODEL_NAME"
