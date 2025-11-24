@@ -29,16 +29,32 @@ def service_url():
     except (subprocess.CalledProcessError, FileNotFoundError) as e:
         pytest.fail(f"Error retrieving service URL: {e}")
 
-def test_models_endpoint(service_url):
+@pytest.fixture(scope="module")
+def auth_token():
+    """
+    Get authentication token for Cloud Run.
+    """
+    try:
+        command = ["gcloud", "auth", "print-identity-token"]
+        process = subprocess.run(command, capture_output=True, text=True, check=True)
+        token = process.stdout.strip()
+        if not token:
+            pytest.fail("Failed to retrieve authentication token.")
+        return token
+    except (subprocess.CalledProcessError, FileNotFoundError) as e:
+        pytest.fail(f"Error retrieving auth token: {e}")
+
+def test_models_endpoint(service_url, auth_token):
     """
     Tests the /v1/models endpoint.
     """
     endpoint_url = f"{service_url}/v1/models"
+    headers = {"Authorization": f"Bearer {auth_token}"}
     print(f"Pinging model endpoint: {endpoint_url}")
 
     for i in range(5):
         try:
-            response = requests.get(endpoint_url, timeout=30)
+            response = requests.get(endpoint_url, headers=headers, timeout=30)
             print(f"Attempt {i+1}: Received HTTP status: {response.status_code}")
             if response.status_code == 200:
                 break
@@ -56,11 +72,12 @@ def test_models_endpoint(service_url):
     model_ids = [model["id"] for model in response_body["data"]]
     assert "DeepSeek-R1-Distill-Qwen-1.5B" in model_ids, "Model 'DeepSeek-R1-Distill-Qwen-1.5B' not found in response."
 
-def test_completions_endpoint(service_url):
+def test_completions_endpoint(service_url, auth_token):
     """
     Tests the /v1/completions endpoint.
     """
     completions_url = f"{service_url}/v1/completions"
+    headers = {"Authorization": f"Bearer {auth_token}"}
     print(f"Testing completions endpoint: {completions_url}")
 
     payload = {
@@ -70,7 +87,7 @@ def test_completions_endpoint(service_url):
         "temperature": 0.7
     }
 
-    response = requests.post(completions_url, json=payload, timeout=60)
+    response = requests.post(completions_url, json=payload, headers=headers, timeout=60)
     print(f"Completions response: {response.text}")
 
     assert response.status_code == 200, "Completions endpoint returned non-200 status."
