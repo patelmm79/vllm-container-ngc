@@ -39,29 +39,41 @@ echo "[Startup] Adding hostname to /etc/hosts..."
 echo "127.0.0.1 $(hostname)" >> /etc/hosts 2>/dev/null || echo "[Startup] Warning: Could not modify /etc/hosts"
 log_timing "System configuration"
 
+# Source centralized configuration
+echo "[Startup] Loading configuration from /app/config.env..."
+if [ -f /app/config.env ]; then
+    # Export all non-comment, non-empty lines from config.env
+    export $(grep -v '^#' /app/config.env | grep -v '^$' | xargs)
+    echo "[Startup] Configuration loaded successfully"
+else
+    echo "[Startup] Warning: /app/config.env not found, using defaults"
+fi
+
 # Export environment variables that should be inherited by child processes
 # Use existing TORCH_CUDA_ARCH_LIST if set, otherwise default to 7.5 for T4 GPUs
 export TORCH_CUDA_ARCH_LIST="${TORCH_CUDA_ARCH_LIST:-7.5}"
 export HF_HUB_OFFLINE="${HF_HUB_OFFLINE:-1}"
 
-# Resolve the model path from the cache
-# When offline, we need to point to the actual cached directory
-export MODEL_REPO="${MODEL_REPO:-deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B}"
+# Set MODEL_REPO from config.env or use default
+export MODEL_REPO="${MODEL_NAME:-deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B}"
+
+# Set HF_CACHE_DIR from config.env or derive from MODEL_REPO
+export HF_CACHE_DIR="${HF_CACHE_DIR:-models--deepseek-ai--DeepSeek-R1-Distill-Qwen-1.5B}"
 
 # Find the snapshot directory in the HF cache
-if [ -d "${HF_HOME}/models--deepseek-ai--DeepSeek-R1-Distill-Qwen-1.5B" ]; then
+if [ -d "${HF_HOME}/${HF_CACHE_DIR}" ]; then
     # Get the actual snapshot path (there should be only one)
-    SNAPSHOT_DIR=$(find ${HF_HOME}/models--deepseek-ai--DeepSeek-R1-Distill-Qwen-1.5B/snapshots -maxdepth 1 -type d | tail -n 1)
+    SNAPSHOT_DIR=$(find ${HF_HOME}/${HF_CACHE_DIR}/snapshots -maxdepth 1 -type d | tail -n 1)
     if [ -n "$SNAPSHOT_DIR" ]; then
-        export MODEL_NAME="$SNAPSHOT_DIR"
-        echo "[Startup] Using cached model at: $MODEL_NAME"
+        export MODEL_PATH="$SNAPSHOT_DIR"
+        echo "[Startup] Using cached model at: $MODEL_PATH"
     else
-        export MODEL_NAME="${MODEL_REPO}"
-        echo "[Startup] Warning: Could not find snapshot directory, using repo name: $MODEL_NAME"
+        export MODEL_PATH="${MODEL_REPO}"
+        echo "[Startup] Warning: Could not find snapshot directory, using repo name: $MODEL_PATH"
     fi
 else
-    export MODEL_NAME="${MODEL_REPO}"
-    echo "[Startup] Warning: Model cache not found, using repo name: $MODEL_NAME"
+    export MODEL_PATH="${MODEL_REPO}"
+    echo "[Startup] Warning: Model cache not found, using repo name: $MODEL_PATH"
 fi
 
 # Use PORT from Cloud Run (defaults to 8080)
@@ -69,7 +81,8 @@ fi
 export PORT="${PORT:-8080}"
 
 echo "[Startup] Configuration:"
-echo "  MODEL_NAME: $MODEL_NAME"
+echo "  MODEL_REPO: $MODEL_REPO"
+echo "  MODEL_PATH: $MODEL_PATH"
 echo "  PORT: $PORT"
 echo "  TORCH_CUDA_ARCH_LIST: $TORCH_CUDA_ARCH_LIST"
 echo "  HF_HUB_OFFLINE: $HF_HUB_OFFLINE"
@@ -81,7 +94,7 @@ echo ""
 echo "[Startup] Starting vLLM server in background..."
 python3 -m vllm.entrypoints.openai.api_server \
     --port ${PORT} \
-    --model ${MODEL_NAME} \
+    --model ${MODEL_PATH} \
     --gpu-memory-utilization 0.95 \
     --dtype float16 \
     --max-num-seqs 8 \

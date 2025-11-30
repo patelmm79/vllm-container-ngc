@@ -6,6 +6,22 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 This is a containerized vLLM inference server project that serves the DeepSeek-R1-Distill-Qwen-1.5B model (1.5B parameters). The project uses NVIDIA's NGC vLLM container and focuses on creating "pre-warmed" containers where the expensive model loading step is performed during the Docker build process rather than at runtime. The goal is to minimize cold start times for serverless deployments on Google Cloud Run.
 
+## Centralized Configuration
+
+**Important**: The model and deployment configuration is centralized in `config.env` at the root of the repository. To change models or update deployment settings, edit `config.env` - all other files will automatically use these values.
+
+The `config.env` file contains:
+- `MODEL_NAME`: Hugging Face model identifier (e.g., `deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B`)
+- `HF_CACHE_DIR`: Normalized cache directory name (e.g., `models--deepseek-ai--DeepSeek-R1-Distill-Qwen-1.5B`)
+- `SERVICE_NAME`: Cloud Run service name
+- `ARTIFACT_REGISTRY_REPO`: Artifact Registry repository name
+- `ARTIFACT_REGISTRY_IMAGE`: Container image name
+
+This configuration is loaded by:
+- Dockerfile (during build to download the correct model)
+- entrypoint.sh (at runtime to configure the server)
+- prewarm_compile.py (for pre-warming requests)
+
 ## Architecture
 
 The project consists of five main components:
@@ -70,11 +86,16 @@ pytest test_endpoint.py
 
 ## Key Environment Variables
 
-- `MODEL_NAME`: Set to `deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B`
+Configuration is centralized in `config.env`. The following environment variables are used:
+
+- `MODEL_NAME`: Hugging Face model identifier (set in `config.env`)
+- `HF_CACHE_DIR`: Normalized cache directory name (set in `config.env`)
+- `MODEL_REPO`: The model repository identifier (derived from `MODEL_NAME`)
+- `MODEL_PATH`: The actual filesystem path to the cached model (resolved at runtime)
 - `HF_HOME`: Model cache directory (`/model-cache`)
-- `HF_TOKEN`: Required for downloading the model from Hugging Face
+- `HF_TOKEN`: Required for downloading the model from Hugging Face (Secret Manager)
 - `HF_HUB_OFFLINE`: Set to `1` in final container to prevent runtime Hub access
-- `PORT`: Server port (defaults to 8000)
+- `PORT`: Server port (defaults to 8080 on Cloud Run, 8000 locally)
 - `MAX_MODEL_LEN`: Optional model length limit
 - `TORCH_CUDA_ARCH_LIST`: CUDA compute capability for target GPU (default: `7.5` for T4)
   - Set as a build argument in both Dockerfile and Cloud Build configuration
@@ -163,6 +184,46 @@ When `VLLM_TORCH_COMPILE_LEVEL > 0`, the container implements runtime pre-warmin
 - Hugging Face token is handled securely via Google Secret Manager
 - Container runs offline at runtime to prevent unauthorized Hub access
 - Model weights are cached during build to avoid runtime downloads
+
+## Changing Models
+
+To switch to a different model, follow these steps:
+
+1. **Edit `config.env`** and update the following variables:
+   ```bash
+   # Example: Switching to Llama 3.2 1B
+   MODEL_NAME=meta-llama/Llama-3.2-1B
+
+   # Update HF_CACHE_DIR (replace "/" with "--", add "models--" prefix)
+   HF_CACHE_DIR=models--meta-llama--Llama-3.2-1B
+
+   # Optionally update service names
+   SERVICE_NAME=vllm-llama-3-2-1b
+   ARTIFACT_REGISTRY_REPO=vllm-llama-repo
+   ARTIFACT_REGISTRY_IMAGE=vllm-llama-3-2-1b
+   ```
+
+2. **Ensure your HF_TOKEN has access** to the new model on Hugging Face Hub
+
+3. **Create Artifact Registry repository** (if you changed the repo name):
+   ```bash
+   gcloud artifacts repositories create vllm-llama-repo \
+     --repository-format=docker \
+     --location=us-central1
+   ```
+
+4. **Update `cloudbuild.yaml`** substitutions section (if you changed artifact registry names):
+   ```yaml
+   substitutions:
+     _IMAGE: 'us-central1-docker.pkg.dev/${PROJECT_ID}/vllm-llama-repo/vllm-llama-3-2-1b'
+   ```
+
+5. **Rebuild and deploy**:
+   ```bash
+   gcloud builds submit --config cloudbuild.yaml
+   ```
+
+That's it! All scripts and configuration will automatically use the values from `config.env`.
 
 ## Development Workflow
 

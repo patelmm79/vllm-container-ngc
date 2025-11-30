@@ -8,6 +8,7 @@ This project creates "pre-warmed" Docker containers where the expensive model lo
 
 ### Key Features
 
+- **Centralized Configuration**: All model and deployment settings in one `config.env` file - change models easily
 - **Pre-warmed Model Loading**: Model downloads and initialization happen during build time
 - **Offline Runtime**: Container runs completely offline without Hugging Face Hub access
 - **OpenAI-Compatible API**: Serves model via vLLM's OpenAI-compatible API on port 8000
@@ -22,7 +23,8 @@ The project consists of three main components:
 ### 1. Dockerfile
 
 Builds a container based on `nvcr.io/nvidia/vllm:25.10-py3` (NVIDIA NGC) that:
-- Downloads the `deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B` model during build time using a Hugging Face token
+- Loads model configuration from `config.env` for centralized management
+- Downloads the specified model during build time using a Hugging Face token
 - Configures the container to run offline (no Hugging Face Hub access at runtime)
 - Sets up custom entrypoint for optional pre-warming when torch.compile is enabled
 - Serves the model via OpenAI-compatible API on port 8000
@@ -66,13 +68,29 @@ gcloud builds submit --config cloudbuild.yaml
 
 ## Configuration
 
+### Centralized Model Configuration
+
+All model and deployment configuration is centralized in `config.env`. To change models, simply edit this file:
+
+```bash
+# config.env
+MODEL_NAME=deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B
+HF_CACHE_DIR=models--deepseek-ai--DeepSeek-R1-Distill-Qwen-1.5B
+SERVICE_NAME=vllm-deepseek-r1-1-5b
+ARTIFACT_REGISTRY_REPO=vllm-deepseek-r1-repo
+ARTIFACT_REGISTRY_IMAGE=vllm-deepseek-r1-1-5b
+```
+
+See the "Changing Models" section in `CLAUDE.md` for detailed instructions.
+
 ### Environment Variables
 
-- `MODEL_NAME`: Set to `deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B`
+- `MODEL_NAME`: Hugging Face model identifier (set in `config.env`)
+- `HF_CACHE_DIR`: Normalized cache directory name (set in `config.env`)
 - `HF_HOME`: Model cache directory (`/model-cache`)
 - `HF_TOKEN`: Required for downloading the model from Hugging Face (build time only)
 - `HF_HUB_OFFLINE`: Set to `1` in final container to prevent runtime Hub access
-- `PORT`: Server port (defaults to 8000)
+- `PORT`: Server port (defaults to 8080 on Cloud Run, 8000 locally)
 - `MAX_MODEL_LEN`: Optional model length limit
 - `TORCH_CUDA_ARCH_LIST`: CUDA compute capability for target GPU (default: `7.5` for T4)
 - `VLLM_TORCH_COMPILE_LEVEL`: torch.compile optimization level (default: `0`)
@@ -112,8 +130,8 @@ If you have **sustained, consistent traffic**, you can enable torch.compile for 
 ## Runtime Configuration
 
 The container serves the model via vLLM's OpenAI-compatible API with these defaults:
-- Port: 8000 (configurable via `PORT` env var)
-- Model: `deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B` (1.5B parameters)
+- Port: 8080 (Cloud Run) or 8000 (local, configurable via `PORT` env var)
+- Model: Specified in `config.env` (default: `deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B`, 1.5B parameters)
 - Data type: float16
 - Optional max model length via `MAX_MODEL_LEN`
 
