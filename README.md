@@ -156,6 +156,64 @@ The primary goal of this project is to containerize DeepSeek-R1-Distill-Qwen-1.5
 - **Automated Deployment**: Automatically deploy the container to Cloud Run when Cloud Build completes successfully
 - **Post-Deployment Test**: Run automated tests that call the Cloud Run service endpoint to verify the LLM is responsive and provides valid output
 
+## Testing
+
+The project includes automated tests in `test_endpoint.py` that verify the deployed Cloud Run service.
+
+### Testing with gcloud CLI (Recommended)
+
+If you have `gcloud` CLI installed and configured:
+
+```bash
+# Run tests (automatically fetches service URL and auth token)
+pytest test_endpoint.py -v
+```
+
+### Testing without gcloud CLI
+
+If you don't have `gcloud` installed locally (e.g., testing from Windows without SDK):
+
+1. **Create test configuration file**:
+   ```bash
+   cp .env.test.example .env.test
+   ```
+
+2. **Fill in the values in `.env.test`**:
+   - Get `SERVICE_URL` from [Cloud Console](https://console.cloud.google.com/run) or run this command on a machine with gcloud:
+     ```bash
+     gcloud run services describe vllm-deepseek-r1-1-5b --platform managed --region us-central1 --format "value(status.url)"
+     ```
+   - Get `AUTH_TOKEN` by running this command on a machine with gcloud:
+     ```bash
+     gcloud auth print-identity-token
+     ```
+
+3. **Run tests using the helper script**:
+
+   **PowerShell** (Recommended for Windows):
+   ```powershell
+   .\test_local.ps1
+   ```
+
+   **Batch** (Alternative):
+   ```batch
+   test_local.bat
+   ```
+
+   **Manual** (Any platform):
+   ```bash
+   # Set environment variables and run pytest
+   export SERVICE_URL="your-service-url"
+   export AUTH_TOKEN="your-auth-token"
+   pytest test_endpoint.py -v
+   ```
+
+### What the Tests Verify
+
+- `/v1/models` endpoint returns the correct model
+- `/v1/completions` endpoint generates text successfully
+- Service is responsive and returns valid JSON responses
+
 ## License
 
 This project is provided as-is for containerizing and deploying vLLM inference servers.

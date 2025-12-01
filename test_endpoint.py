@@ -32,7 +32,15 @@ REGION = "us-central1"
 def service_url():
     """
     Retrieves the Cloud Run service URL.
+    First checks SERVICE_URL environment variable, then falls back to gcloud.
     """
+    # Check for environment variable first
+    env_url = os.environ.get('SERVICE_URL')
+    if env_url:
+        print(f"Using SERVICE_URL from environment: {env_url}")
+        return env_url
+
+    # Fall back to gcloud
     try:
         command = [
             "gcloud", "run", "services", "describe",
@@ -47,13 +55,22 @@ def service_url():
             pytest.fail("Failed to retrieve Cloud Run service URL.")
         return url
     except (subprocess.CalledProcessError, FileNotFoundError) as e:
-        pytest.fail(f"Error retrieving service URL: {e}")
+        pytest.fail(f"Error retrieving service URL: {e}. "
+                   f"Install gcloud CLI or set SERVICE_URL environment variable.")
 
 @pytest.fixture(scope="module")
 def auth_token():
     """
     Get authentication token for Cloud Run.
+    First checks AUTH_TOKEN environment variable, then falls back to gcloud.
     """
+    # Check for environment variable first
+    env_token = os.environ.get('AUTH_TOKEN')
+    if env_token:
+        print(f"Using AUTH_TOKEN from environment")
+        return env_token
+
+    # Fall back to gcloud
     try:
         command = ["gcloud", "auth", "print-identity-token"]
         process = subprocess.run(command, capture_output=True, text=True, check=True)
@@ -62,7 +79,8 @@ def auth_token():
             pytest.fail("Failed to retrieve authentication token.")
         return token
     except (subprocess.CalledProcessError, FileNotFoundError) as e:
-        pytest.fail(f"Error retrieving auth token: {e}")
+        pytest.fail(f"Error retrieving auth token: {e}. "
+                   f"Install gcloud CLI or set AUTH_TOKEN environment variable.")
 
 def test_models_endpoint(service_url, auth_token):
     """

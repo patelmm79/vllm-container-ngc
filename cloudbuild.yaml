@@ -51,15 +51,18 @@ steps:
     '--startup-probe', 'httpGet.path=/health,httpGet.port=8080,initialDelaySeconds=30,periodSeconds=10,timeoutSeconds=10,failureThreshold=30'
   ]
 
-- name: 'python:3.9-slim'
+- name: 'gcr.io/google.com/cloudsdktool/cloud-sdk:slim'
   id: test
   waitFor: ['deploy']
   entrypoint: 'bash'
   args:
     - -c
     - |
-      pip install -r requirements-test.txt
-      pytest test_endpoint.py
+      # Install Python 3.13
+      apt-get update && apt-get install -y python3.13 python3.13-venv python3-pip
+      # Use Python 3.13 for tests
+      python3.13 -m pip install -r requirements-test.txt
+      python3.13 -m pytest test_endpoint.py -v
 
 availableSecrets:
   secretManager:
