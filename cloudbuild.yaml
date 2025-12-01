@@ -27,21 +27,23 @@ steps:
   args:
     - -c
     - |
-        # Load config
+        # Load config and construct image path
         source /workspace/build_config.env
-        IMAGE="us-central1-docker.pkg.dev/${PROJECT_ID}/$ARTIFACT_REGISTRY_REPO/$ARTIFACT_REGISTRY_IMAGE"
+
+        # Build image path (using $$ to escape variables from Cloud Build parser)
+        IMAGE="us-central1-docker.pkg.dev/${PROJECT_ID}/$$ARTIFACT_REGISTRY_REPO/$$ARTIFACT_REGISTRY_IMAGE"
 
         # Pass TORCH_CUDA_ARCH_LIST as a build arg to the Docker build
         docker buildx build \
-          --tag=$IMAGE \
+          --tag="$$IMAGE" \
           --secret id=HF_TOKEN,env=HF_TOKEN \
           --build-arg TORCH_CUDA_ARCH_LIST=7.5 \
           .
         # Push the image to Artifact Registry
-        docker push $IMAGE
+        docker push "$$IMAGE"
 
         # Save IMAGE for subsequent steps
-        echo "IMAGE=$IMAGE" > /workspace/image_path.env
+        echo "IMAGE=$$IMAGE" > /workspace/image_path.env
 
 - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
   id: deploy
@@ -54,9 +56,9 @@ steps:
         source /workspace/build_config.env
         source /workspace/image_path.env
 
-        # Deploy to Cloud Run with dynamic service name
-        gcloud run deploy "$SERVICE_NAME" \
-          --image="$IMAGE" \
+        # Deploy to Cloud Run with dynamic service name (using $$ to escape from Cloud Build)
+        gcloud run deploy "$$SERVICE_NAME" \
+          --image="$$IMAGE" \
           --region=us-central1 \
           --platform=managed \
           --execution-environment=gen2 \
