@@ -29,7 +29,7 @@ steps:
     - |
         # Load config
         source /workspace/build_config.env
-        IMAGE="us-central1-docker.pkg.dev/${PROJECT_ID}/${ARTIFACT_REGISTRY_REPO}/${ARTIFACT_REGISTRY_IMAGE}"
+        IMAGE="us-central1-docker.pkg.dev/${PROJECT_ID}/$ARTIFACT_REGISTRY_REPO/$ARTIFACT_REGISTRY_IMAGE"
 
         # Pass TORCH_CUDA_ARCH_LIST as a build arg to the Docker build
         docker buildx build \
