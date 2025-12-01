@@ -8,11 +8,11 @@ steps:
   args:
     - -c
     - |
-        # Load configuration from config.env and export as Cloud Build substitutions
-        source config.env
-        echo "SERVICE_NAME=$SERVICE_NAME" > /workspace/build_config.env
-        echo "ARTIFACT_REGISTRY_REPO=$ARTIFACT_REGISTRY_REPO" >> /workspace/build_config.env
-        echo "ARTIFACT_REGISTRY_IMAGE=$ARTIFACT_REGISTRY_IMAGE" >> /workspace/build_config.env
+        # Extract configuration from config.env and save for later steps
+        # Using grep to avoid Cloud Build parsing variable references
+        grep "^SERVICE_NAME=" config.env > /workspace/build_config.env
+        grep "^ARTIFACT_REGISTRY_REPO=" config.env >> /workspace/build_config.env
+        grep "^ARTIFACT_REGISTRY_IMAGE=" config.env >> /workspace/build_config.env
         cat /workspace/build_config.env
 
 - name: 'gcr.io/cloud-builders/docker'
