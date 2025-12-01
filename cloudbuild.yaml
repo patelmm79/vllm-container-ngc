@@ -52,16 +52,14 @@ steps:
   ]
 
 - name: 'python:3.9-slim'
-  id: install-dependencies
-  waitFor: ['deploy']
-  entrypoint: 'pip'
-  args: ['install', '-r', 'requirements-test.txt']
-
-- name: 'python:3.9-slim'
   id: test
-  waitFor: ['install-dependencies']
-  entrypoint: 'pytest'
-  args: ['test_endpoint.py']
+  waitFor: ['deploy']
+  entrypoint: 'bash'
+  args:
+    - -c
+    - |
+      pip install -r requirements-test.txt
+      pytest test_endpoint.py
 
 availableSecrets:
   secretManager:

@@ -17,9 +17,11 @@ import requests
 from typing import List
 
 # Configuration
-# MODEL_REPO is the Hugging Face model identifier (used for API requests)
+# MODEL_REPO is the Hugging Face model identifier
 # This is loaded from config.env via entrypoint.sh
 MODEL_REPO = os.environ.get('MODEL_REPO', os.environ.get('MODEL_NAME', 'deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B'))
+# Extract just the model ID (last part after /) for API requests
+MODEL_ID = MODEL_REPO.split('/')[-1] if '/' in MODEL_REPO else MODEL_REPO
 PORT = os.environ.get('PORT', '8000')
 BASE_URL = f"http://localhost:{PORT}"
 COMPLETIONS_ENDPOINT = f"{BASE_URL}/v1/completions"
@@ -116,7 +118,7 @@ def prewarm_request(prompt_length: int, request_num: int, total_requests: int) -
     prompt = generate_prompt_of_length(prompt_length)
 
     payload = {
-        "model": MODEL_REPO,
+        "model": MODEL_ID,
         "prompt": prompt,
         "max_tokens": 10,  # Short generation, we just want to trigger compilation
         "temperature": 0.0
@@ -208,7 +210,7 @@ def main() -> int:
         print("[Pre-warm] torch.compile is disabled (VLLM_TORCH_COMPILE_LEVEL=0), skipping pre-warming", flush=True)
         return 0
 
-    print(f"[Pre-warm] Model: {MODEL_REPO}", flush=True)
+    print(f"[Pre-warm] Model: {MODEL_REPO} (API ID: {MODEL_ID})", flush=True)
     print(f"[Pre-warm] Server: {BASE_URL}", flush=True)
     print(f"[Pre-warm] torch.compile level: {compile_level}", flush=True)
 
