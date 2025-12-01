@@ -3,7 +3,21 @@
 # User-defined substitutions must start with underscore (e.g., _MY_VAR)
 steps:
 - name: 'gcr.io/cloud-builders/docker'
+  id: load-config
+  entrypoint: 'bash'
+  args:
+    - -c
+    - |
+        # Load configuration from config.env and export as Cloud Build substitutions
+        source config.env
+        echo "SERVICE_NAME=$SERVICE_NAME" > /workspace/build_config.env
+        echo "ARTIFACT_REGISTRY_REPO=$ARTIFACT_REGISTRY_REPO" >> /workspace/build_config.env
+        echo "ARTIFACT_REGISTRY_IMAGE=$ARTIFACT_REGISTRY_IMAGE" >> /workspace/build_config.env
+        cat /workspace/build_config.env
+
+- name: 'gcr.io/cloud-builders/docker'
   id: build
+  waitFor: ['load-config']
   entrypoint: 'bash'
   secretEnv: ['HF_TOKEN']
   env:
@@ -13,43 +27,51 @@ steps:
   args:
     - -c
     - |
+        # Load config
+        source /workspace/build_config.env
+        IMAGE="us-central1-docker.pkg.dev/${PROJECT_ID}/${ARTIFACT_REGISTRY_REPO}/${ARTIFACT_REGISTRY_IMAGE}"
+
         # Pass TORCH_CUDA_ARCH_LIST as a build arg to the Docker build
         docker buildx build \
-          --tag=${_IMAGE} \
+          --tag=$IMAGE \
           --secret id=HF_TOKEN,env=HF_TOKEN \
           --build-arg TORCH_CUDA_ARCH_LIST=7.5 \
           .
         # Push the image to Artifact Registry
-        docker push ${_IMAGE}
+        docker push $IMAGE
+
+        # Save IMAGE for subsequent steps
+        echo "IMAGE=$IMAGE" > /workspace/image_path.env
 
 - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
   id: deploy
   waitFor: ['build']
-  entrypoint: 'gcloud'
-  args: [
-    'run', 'deploy', 'vllm-deepseek-r1-1-5b',
-    '--image', '${_IMAGE}',
-    '--region', 'us-central1',
-    '--platform', 'managed',
-    '--execution-environment', 'gen2',
-    # Resource allocation for GPU workloads
-    '--cpu', '8',
-    '--memory', '32Gi',
-    '--gpu', '1',
-    '--gpu-type', 'nvidia-l4',
-    '--no-cpu-throttling',
-    # Performance and scaling configuration
-    '--timeout', '600',
-    '--concurrency', '1',
-    '--min-instances', '1',
-    '--max-instances', '3',
-    # Startup probe configuration (prevents routing requests before ready)
-    # 30 attempts × 10s = 5 minute timeout for model loading
-    # Using /health endpoint (available immediately after server starts)
-    '--cpu-boost',
-    '--port', '8080',
-    '--startup-probe', 'httpGet.path=/health,httpGet.port=8080,initialDelaySeconds=30,periodSeconds=10,timeoutSeconds=10,failureThreshold=30'
-  ]
+  entrypoint: 'bash'
+  args:
+    - -c
+    - |
+        # Load config
+        source /workspace/build_config.env
+        source /workspace/image_path.env
+
+        # Deploy to Cloud Run with dynamic service name
+        gcloud run deploy "$SERVICE_NAME" \
+          --image="$IMAGE" \
+          --region=us-central1 \
+          --platform=managed \
+          --execution-environment=gen2 \
+          --cpu=8 \
+          --memory=32Gi \
+          --gpu=1 \
+          --gpu-type=nvidia-l4 \
+          --no-cpu-throttling \
+          --timeout=600 \
+          --concurrency=1 \
+          --min-instances=1 \
+          --max-instances=3 \
+          --cpu-boost \
+          --port=8080 \
+          --startup-probe=httpGet.path=/health,httpGet.port=8080,initialDelaySeconds=30,periodSeconds=10,timeoutSeconds=10,failureThreshold=30
 
 - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk:slim'
   id: test
@@ -69,10 +91,8 @@ availableSecrets:
   - versionName: 'projects/${PROJECT_ID}/secrets/HF_TOKEN/versions/latest'
     env: 'HF_TOKEN'
 
-images: ["${_IMAGE}"]
-
-substitutions:
-  _IMAGE: 'us-central1-docker.pkg.dev/${PROJECT_ID}/vllm-deepseek-r1-repo/vllm-deepseek-r1-1-5b'
+# Note: images list is populated from config.env at build time
+# The actual image path is: us-central1-docker.pkg.dev/${PROJECT_ID}/${ARTIFACT_REGISTRY_REPO}/${ARTIFACT_REGISTRY_IMAGE}
 
 options:
   dynamicSubstitutions: true
