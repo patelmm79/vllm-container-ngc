@@ -69,11 +69,12 @@ The project consists of six main components:
    - Fetches logs for failed builds from Cloud Logging
    - Prepared for integration with Gemini API for automated failure analysis (commented out)
 
-7. **API Key Management** (`manage_api_keys.py`):
-   - Command-line tool for managing API keys in Google Secret Manager
+7. **API Key Management** ([databitings-api-key-manager](https://github.com/patelmm79/databitings-api-key-manager)):
+   - Separate CLI tool repository for managing API keys in Google Secret Manager
    - Generates secure random API keys with `sk-` prefix
    - Supports adding, listing, removing, and rotating keys
    - Keys stored as JSON in Secret Manager for easy management
+   - Reusable across multiple projects and services
 
 ## Build Commands
 
@@ -164,17 +165,23 @@ The service uses API key authentication to protect access. API keys are stored i
 
 ### Initial Setup
 
-**1. Create the Secret Manager secret:**
+**1. Install the API key manager tool:**
+
+API keys are managed using the separate [databitings-api-key-manager](https://github.com/patelmm79/databitings-api-key-manager) repository.
 
 ```bash
-# Install dependencies locally (if not already installed)
-pip install google-cloud-secret-manager
+# Clone the repository
+git clone https://github.com/patelmm79/databitings-api-key-manager.git
+cd databitings-api-key-manager
+
+# Install dependencies
+pip install -r requirements.txt
 
 # Set your GCP project ID
 export PROJECT_ID="your-project-id"
 
 # Create the secret
-python manage_api_keys.py create-secret --project $PROJECT_ID
+python manage_api_keys.py create-secret --project $PROJECT_ID --secret vllm-api-keys
 ```
 
 **2. Grant Cloud Run service account access to Secret Manager:**
@@ -193,31 +200,33 @@ gcloud secrets add-iam-policy-binding vllm-api-keys \
 **3. Generate your first API key:**
 
 ```bash
-python manage_api_keys.py add-key --project $PROJECT_ID --name "my-local-service"
+python manage_api_keys.py add-key --project $PROJECT_ID --secret vllm-api-keys --name "my-local-service"
 ```
 
 This will output a new API key like `sk-abc123...`. **Save this key securely** - it won't be shown again!
 
 ### Managing API Keys
 
+For complete documentation on managing API keys, see the [databitings-api-key-manager README](https://github.com/patelmm79/databitings-api-key-manager#readme).
+
 **List all API keys (names only):**
 ```bash
-python manage_api_keys.py list-keys --project $PROJECT_ID
+python manage_api_keys.py list-keys --project $PROJECT_ID --secret vllm-api-keys
 ```
 
 **Add a new API key:**
 ```bash
-python manage_api_keys.py add-key --project $PROJECT_ID --name "production-app"
+python manage_api_keys.py add-key --project $PROJECT_ID --secret vllm-api-keys --name "production-app"
 ```
 
 **Remove an API key:**
 ```bash
-python manage_api_keys.py remove-key --project $PROJECT_ID --name "old-service"
+python manage_api_keys.py remove-key --project $PROJECT_ID --secret vllm-api-keys --name "old-service"
 ```
 
 **Rotate a key (generate new key for existing name):**
 ```bash
-python manage_api_keys.py rotate-key --project $PROJECT_ID --name "my-local-service"
+python manage_api_keys.py rotate-key --project $PROJECT_ID --secret vllm-api-keys --name "my-local-service"
 ```
 
 ### Using API Keys

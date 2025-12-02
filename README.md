@@ -8,6 +8,7 @@ This project creates "pre-warmed" Docker containers where the expensive model lo
 
 ### Key Features
 
+- **API Key Authentication**: FastAPI gateway with secure API key management via Google Secret Manager
 - **Centralized Configuration**: All model and deployment settings in one `config.env` file - change models easily
 - **Pre-warmed Model Loading**: Model downloads and initialization happen during build time
 - **Offline Runtime**: Container runs completely offline without Hugging Face Hub access
@@ -135,8 +136,52 @@ The container serves the model via vLLM's OpenAI-compatible API with these defau
 - Data type: float16
 - Optional max model length via `MAX_MODEL_LEN`
 
+## API Key Authentication
+
+This service includes API key authentication via a FastAPI gateway. API keys are managed using the separate [databitings-api-key-manager](https://github.com/patelmm79/databitings-api-key-manager) tool.
+
+### Quick Setup
+
+1. **Install the API key manager:**
+   ```bash
+   git clone https://github.com/patelmm79/databitings-api-key-manager.git
+   cd databitings-api-key-manager
+   pip install -r requirements.txt
+   ```
+
+2. **Create secret and generate keys:**
+   ```bash
+   export PROJECT_ID="your-gcp-project"
+
+   # Create secret
+   python manage_api_keys.py create-secret --project $PROJECT_ID --secret vllm-api-keys
+
+   # Grant Cloud Run access
+   PROJECT_NUMBER=$(gcloud projects describe $PROJECT_ID --format="value(projectNumber)")
+   gcloud secrets add-iam-policy-binding vllm-api-keys \
+     --member="serviceAccount:${PROJECT_NUMBER}-compute@developer.gserviceaccount.com" \
+     --role="roles/secretmanager.secretAccessor"
+
+   # Generate API key
+   python manage_api_keys.py add-key --project $PROJECT_ID --secret vllm-api-keys --name "my-service"
+   ```
+
+3. **Use the API key in requests:**
+   ```bash
+   SERVICE_URL=$(gcloud run services describe vllm-deepseek-r1-1-5b --region us-central1 --format='value(status.url)')
+
+   curl -X POST "${SERVICE_URL}/v1/completions" \
+     -H "Content-Type: application/json" \
+     -H "X-API-Key: sk-your-api-key-here" \
+     -d '{"model": "deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B", "prompt": "Hello!", "max_tokens": 20}'
+   ```
+
+See [CLAUDE.md](CLAUDE.md#api-key-setup-and-management) for detailed API key setup and management documentation.
+
 ## Security
 
+- **API key authentication** protects access to the inference endpoint
+- API keys stored encrypted in Google Secret Manager
 - Hugging Face token is handled securely via Google Secret Manager
 - Container runs offline at runtime to prevent unauthorized Hub access
 - Model weights are cached during build to avoid runtime downloads
