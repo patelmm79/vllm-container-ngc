@@ -1,0 +1,2 @@
+# Requirements for API key management script (manage_api_keys.py)
+google-cloud-secret-manager>=2.16.0

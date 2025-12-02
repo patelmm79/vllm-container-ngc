@@ -58,15 +58,21 @@ ENV VLLM_TORCH_COMPILE_LEVEL=0
 # when the vLLM server receives requests with trace headers but doesn't have an OTLP exporter configured
 ENV OTEL_SDK_DISABLED=true
 
-# Install requests library for pre-warming script
-RUN pip install --no-cache-dir requests
+# Install dependencies for pre-warming script and API gateway
+RUN pip install --no-cache-dir \
+    requests \
+    fastapi \
+    uvicorn[standard] \
+    httpx \
+    google-cloud-secret-manager
 
-# Copy pre-warming script and startup script
+# Copy API gateway, pre-warming script, and startup script
+COPY api_gateway.py /app/api_gateway.py
 COPY prewarm_compile.py /app/prewarm_compile.py
 COPY entrypoint.sh /app/entrypoint.sh
 
 # Make scripts executable
-RUN chmod +x /app/prewarm_compile.py /app/entrypoint.sh
+RUN chmod +x /app/api_gateway.py /app/prewarm_compile.py /app/entrypoint.sh
 
 # Use custom entrypoint that handles pre-warming
 # The entrypoint script will:

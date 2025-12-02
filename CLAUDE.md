@@ -6,6 +6,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 This is a containerized vLLM inference server project that serves the DeepSeek-R1-Distill-Qwen-1.5B model (1.5B parameters). The project uses NVIDIA's NGC vLLM container and focuses on creating "pre-warmed" containers where the expensive model loading step is performed during the Docker build process rather than at runtime. The goal is to minimize cold start times for serverless deployments on Google Cloud Run.
 
+**Security**: The service includes a FastAPI API gateway that provides API key authentication using Google Secret Manager, protecting the vLLM inference endpoint from unauthorized access.
+
 ## Centralized Configuration
 
 **Important**: The model and deployment configuration is centralized in `config.env` at the root of the repository. To change models or update deployment settings, edit `config.env` - all other files will automatically use these values.
@@ -24,37 +26,54 @@ This configuration is loaded by:
 
 ## Architecture
 
-The project consists of five main components:
+The project consists of six main components:
 
 1. **Dockerfile**: Builds a container based on `nvcr.io/nvidia/vllm:25.10-py3` (NVIDIA NGC) that:
    - Downloads the `deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B` model during build time using a Hugging Face token
    - Configures the runtime environment to run offline (no Hugging Face Hub access)
    - Sets up custom entrypoint for pre-warming when torch.compile is enabled
-   - Serves the model via OpenAI-compatible API on port 8000
+   - Installs FastAPI and dependencies for API gateway
+   - Serves the model via OpenAI-compatible API with API key authentication
 
-2. **Runtime Entrypoint** (`entrypoint.sh` + `prewarm_compile.py`):
+2. **API Gateway** (`api_gateway.py`):
+   - FastAPI application that provides API key authentication
+   - Loads valid API keys from Google Secret Manager on startup
+   - Validates `X-API-Key` header on all requests (except `/health`)
+   - Proxies authenticated requests to vLLM server on internal port 8080
+   - Returns 401 Unauthorized for invalid or missing API keys
+   - Provides `/admin/reload-keys` endpoint to refresh keys without restarting
+
+3. **Runtime Entrypoint** (`entrypoint.sh` + `prewarm_compile.py`):
    - `entrypoint.sh`: Custom startup script with comprehensive timing instrumentation
-   - Starts vLLM server in background and manages its lifecycle
+   - Starts vLLM server in background on port 8080 (internal only)
    - Conditionally runs pre-warming if `VLLM_TORCH_COMPILE_LEVEL > 0`
+   - Starts API gateway in foreground on port 8000 (exposed to Cloud Run)
    - `prewarm_compile.py`: Makes test requests with various input lengths (128, 256, 512, 1024, 2048 tokens) to populate torch.compile cache
-   - Keeps server running in foreground for normal operation
+   - Manages lifecycle of both services
 
-3. **Cloud Build Pipeline** (`cloudbuild.yaml`): Multi-step CI/CD pipeline with:
+4. **Cloud Build Pipeline** (`cloudbuild.yaml`): Multi-step CI/CD pipeline with:
    - **Build step**: Uses Docker buildx with `E2_HIGHCPU_8` machine, securely injects `HF_TOKEN` from Secret Manager
    - **Deploy step**: Automatically deploys to Cloud Run (`vllm-deepseek-r1-1-5b` service) with GPU configuration (8 CPU, 32Gi memory, 1x nvidia-l4)
+   - Sets environment variables for Secret Manager integration (`GCP_PROJECT`, `API_KEYS_SECRET_NAME`)
    - **Test step**: Installs dependencies and runs pytest tests against deployed service
    - Pushes to Google Artifact Registry at `us-central1-docker.pkg.dev/${PROJECT_ID}/vllm-deepseek-r1-repo/vllm-deepseek-r1-1-5b`
 
-4. **Testing Infrastructure**:
+5. **Testing Infrastructure**:
    - `test_endpoint.py`: Pytest-based tests that verify `/v1/models` and `/v1/completions` endpoints
    - `test_endpoint.sh`: Bash-based health check script (alternative to pytest)
    - Tests retrieve Cloud Run service URL dynamically and verify model responsiveness
    - `requirements-test.txt`: Test dependencies (pytest, requests)
 
-5. **Build Notification Handler** (`build-notification-handler/main.py`):
+6. **Build Notification Handler** (`build-notification-handler/main.py`):
    - Cloud Function that responds to Cloud Build Pub/Sub notifications
    - Fetches logs for failed builds from Cloud Logging
    - Prepared for integration with Gemini API for automated failure analysis (commented out)
+
+7. **API Key Management** (`manage_api_keys.py`):
+   - Command-line tool for managing API keys in Google Secret Manager
+   - Generates secure random API keys with `sk-` prefix
+   - Supports adding, listing, removing, and rotating keys
+   - Keys stored as JSON in Secret Manager for easy management
 
 ## Build Commands
 
@@ -111,6 +130,11 @@ Configuration is centralized in `config.env`. The following environment variable
 - `TORCH_DISTRIBUTED_DEBUG`: Set to `OFF` to suppress c10d warnings about destroy_process_group()
 - `OTEL_SDK_DISABLED`: Set to `true` to disable OpenTelemetry and prevent trace context warnings
 
+**API Gateway Environment Variables:**
+- `GCP_PROJECT`: Google Cloud project ID (automatically set by Cloud Run deployment)
+- `API_KEYS_SECRET_NAME`: Name of the Secret Manager secret containing API keys (default: `vllm-api-keys`)
+- `VLLM_BASE_URL`: Internal URL of vLLM server (default: `http://localhost:8080`)
+
 ## Runtime Configuration
 
 The container serves the model via vLLM's OpenAI-compatible API with these defaults:
@@ -133,6 +157,132 @@ The container serves the model via vLLM's OpenAI-compatible API with these defau
 - Max instances: 10
 - CPU boost enabled for faster cold starts
 - Startup probe: HTTP health check on `/health` endpoint (60 attempts × 10s = 10 minute timeout)
+
+## API Key Setup and Management
+
+The service uses API key authentication to protect access. API keys are stored in Google Secret Manager and validated by the FastAPI gateway.
+
+### Initial Setup
+
+**1. Create the Secret Manager secret:**
+
+```bash
+# Install dependencies locally (if not already installed)
+pip install google-cloud-secret-manager
+
+# Set your GCP project ID
+export PROJECT_ID="your-project-id"
+
+# Create the secret
+python manage_api_keys.py create-secret --project $PROJECT_ID
+```
+
+**2. Grant Cloud Run service account access to Secret Manager:**
+
+```bash
+# Get your Cloud Run service account (format: PROJECT_NUMBER-compute@developer.gserviceaccount.com)
+PROJECT_NUMBER=$(gcloud projects describe $PROJECT_ID --format="value(projectNumber)")
+SERVICE_ACCOUNT="${PROJECT_NUMBER}-compute@developer.gserviceaccount.com"
+
+# Grant Secret Manager access
+gcloud secrets add-iam-policy-binding vllm-api-keys \
+  --member="serviceAccount:${SERVICE_ACCOUNT}" \
+  --role="roles/secretmanager.secretAccessor"
+```
+
+**3. Generate your first API key:**
+
+```bash
+python manage_api_keys.py add-key --project $PROJECT_ID --name "my-local-service"
+```
+
+This will output a new API key like `sk-abc123...`. **Save this key securely** - it won't be shown again!
+
+### Managing API Keys
+
+**List all API keys (names only):**
+```bash
+python manage_api_keys.py list-keys --project $PROJECT_ID
+```
+
+**Add a new API key:**
+```bash
+python manage_api_keys.py add-key --project $PROJECT_ID --name "production-app"
+```
+
+**Remove an API key:**
+```bash
+python manage_api_keys.py remove-key --project $PROJECT_ID --name "old-service"
+```
+
+**Rotate a key (generate new key for existing name):**
+```bash
+python manage_api_keys.py rotate-key --project $PROJECT_ID --name "my-local-service"
+```
+
+### Using API Keys
+
+Include the API key in the `X-API-Key` header with all requests:
+
+**Example with curl:**
+```bash
+SERVICE_URL=$(gcloud run services describe vllm-deepseek-r1-1-5b --region us-central1 --format='value(status.url)')
+
+curl -X POST "${SERVICE_URL}/v1/completions" \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: sk-your-api-key-here" \
+  -d '{
+    "model": "deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B",
+    "prompt": "Once upon a time",
+    "max_tokens": 50
+  }'
+```
+
+**Example with Python:**
+```python
+import requests
+
+SERVICE_URL = "https://your-service-url.run.app"
+API_KEY = "sk-your-api-key-here"
+
+response = requests.post(
+    f"{SERVICE_URL}/v1/completions",
+    headers={
+        "Content-Type": "application/json",
+        "X-API-Key": API_KEY
+    },
+    json={
+        "model": "deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B",
+        "prompt": "Once upon a time",
+        "max_tokens": 50
+    }
+)
+
+print(response.json())
+```
+
+### Key Rotation Without Downtime
+
+You can rotate keys without restarting the container:
+
+1. Add a new key with the same name (or create a new one)
+2. Update your clients to use the new key
+3. Call the `/admin/reload-keys` endpoint (requires valid API key):
+
+```bash
+curl -X GET "${SERVICE_URL}/admin/reload-keys" \
+  -H "X-API-Key: sk-your-api-key-here"
+```
+
+4. Once all clients are updated, remove the old key from Secret Manager
+
+### Security Notes
+
+- API keys are stored securely in Google Secret Manager with encryption at rest
+- Keys are loaded into memory on container startup and never logged
+- The `/health` endpoint does not require authentication (used for Cloud Run health checks)
+- All other endpoints require a valid API key
+- Invalid API key attempts are logged for audit purposes
 
 ## torch.compile Configuration
 

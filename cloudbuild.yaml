@@ -73,7 +73,8 @@ steps:
           --max-instances=3 \
           --cpu-boost \
           --port=8080 \
-          --startup-probe=httpGet.path=/health,httpGet.port=8080,initialDelaySeconds=30,periodSeconds=10,timeoutSeconds=10,failureThreshold=30
+          --startup-probe=httpGet.path=/health,httpGet.port=8080,initialDelaySeconds=30,periodSeconds=10,timeoutSeconds=10,failureThreshold=30 \
+          --set-env-vars="GCP_PROJECT=${PROJECT_ID},API_KEYS_SECRET_NAME=vllm-api-keys"
 
 - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk:slim'
   id: test

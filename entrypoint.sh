@@ -1,10 +1,11 @@
 #!/bin/bash
-# entrypoint.sh - Startup script for vLLM container with torch.compile pre-warming
+# entrypoint.sh - Startup script for vLLM container with API gateway and torch.compile pre-warming
 #
 # This script:
-# 1. Starts the vLLM server in the background
+# 1. Starts the vLLM server in the background on port 8080
 # 2. Runs the pre-warming script to trigger torch.compile for common input shapes
-# 3. Brings the vLLM server to the foreground for normal operation
+# 3. Starts the FastAPI API gateway in the foreground on port 8000 (with API key auth)
+# 4. API gateway proxies authenticated requests to vLLM server
 
 set -e  # Exit on error
 
@@ -27,7 +28,7 @@ log_timing() {
 }
 
 echo "========================================="
-echo "vLLM Container Startup with Pre-warming"
+echo "vLLM Container with API Gateway"
 echo "========================================="
 log_timing "Container initialization"
 
@@ -76,24 +77,30 @@ else
     echo "[Startup] Warning: Model cache not found, using repo name: $MODEL_PATH"
 fi
 
-# Use PORT from Cloud Run (defaults to 8080)
-# We configure the startup probe to match whatever port Cloud Run sets
-export PORT="${PORT:-8080}"
+# Configure ports
+# Cloud Run sets PORT env var (defaults to 8080), which will be used by the API gateway
+# vLLM server runs on internal port 8080, API gateway exposes on $PORT
+export GATEWAY_PORT="${PORT:-8000}"
+export VLLM_PORT="8080"
+export VLLM_BASE_URL="http://localhost:${VLLM_PORT}"
 
 echo "[Startup] Configuration:"
 echo "  MODEL_REPO: $MODEL_REPO"
 echo "  MODEL_PATH: $MODEL_PATH"
-echo "  PORT: $PORT"
+echo "  GATEWAY_PORT: $GATEWAY_PORT (API gateway with auth)"
+echo "  VLLM_PORT: $VLLM_PORT (internal vLLM server)"
 echo "  TORCH_CUDA_ARCH_LIST: $TORCH_CUDA_ARCH_LIST"
 echo "  HF_HUB_OFFLINE: $HF_HUB_OFFLINE"
 echo "  VLLM_TORCH_COMPILE_LEVEL: ${VLLM_TORCH_COMPILE_LEVEL:-1}"
+echo "  GCP_PROJECT: ${GCP_PROJECT:-not set}"
+echo "  API_KEYS_SECRET_NAME: ${API_KEYS_SECRET_NAME:-vllm-api-keys}"
 log_timing "Environment setup"
 
-# Start vLLM server in the background
+# Start vLLM server in the background on internal port
 echo ""
-echo "[Startup] Starting vLLM server in background..."
+echo "[Startup] Starting vLLM server on internal port ${VLLM_PORT}..."
 python3 -m vllm.entrypoints.openai.api_server \
-    --port ${PORT} \
+    --port ${VLLM_PORT} \
     --model ${MODEL_PATH} \
     --gpu-memory-utilization 0.95 \
     --dtype float16 \
@@ -110,9 +117,17 @@ log_timing "vLLM server startup (background)"
 # Function to cleanup on exit
 cleanup() {
     echo ""
-    echo "[Startup] Received shutdown signal, stopping vLLM server..."
-    kill -TERM "$VLLM_PID" 2>/dev/null || true
+    echo "[Startup] Received shutdown signal, stopping services..."
+    if [ -n "$GATEWAY_PID" ]; then
+        echo "[Startup] Stopping API gateway (PID: $GATEWAY_PID)..."
+        kill -TERM "$GATEWAY_PID" 2>/dev/null || true
+    fi
+    if [ -n "$VLLM_PID" ]; then
+        echo "[Startup] Stopping vLLM server (PID: $VLLM_PID)..."
+        kill -TERM "$VLLM_PID" 2>/dev/null || true
+    fi
     wait "$VLLM_PID" 2>/dev/null || true
+    wait "$GATEWAY_PID" 2>/dev/null || true
     exit 0
 }
 
@@ -136,12 +151,25 @@ if ! kill -0 "$VLLM_PID" 2>/dev/null; then
     exit 1
 fi
 
-# Pre-warming complete, now keep the vLLM server running in foreground
+# Pre-warming complete, now start API gateway in foreground
 echo ""
-echo "[Startup] Pre-warming complete! Server is ready to accept requests."
-echo "[Startup] vLLM server is now running on port $PORT"
-echo "========================================="
-log_timing "Ready to serve"
+echo "[Startup] Pre-warming complete! Starting API gateway..."
+log_timing "Pre-warming complete"
+
+# Start FastAPI API gateway in foreground
+# This will authenticate requests and proxy them to the vLLM server
+echo "[Startup] Starting API gateway on port ${GATEWAY_PORT}..."
+
+# Export environment variables for the API gateway
+export PORT="${GATEWAY_PORT}"
+export VLLM_BASE_URL="${VLLM_BASE_URL}"
+export GCP_PROJECT="${GCP_PROJECT}"
+export API_KEYS_SECRET_NAME="${API_KEYS_SECRET_NAME:-vllm-api-keys}"
+
+python3 /app/api_gateway.py &
+GATEWAY_PID=$!
+echo "[Startup] API gateway started with PID: $GATEWAY_PID"
+log_timing "API gateway startup"
 
 # Print final summary
 echo ""
@@ -152,7 +180,15 @@ TOTAL_COLD_START=$(( $(date +%s%3N) - COLD_START_BEGIN ))
 printf "Total cold start time: %.2f seconds\n" "$(awk "BEGIN {printf \"%.2f\", $TOTAL_COLD_START/1000}")"
 echo "========================================="
 echo ""
+echo "[Startup] Container is ready!"
+echo "  - API Gateway: http://0.0.0.0:${GATEWAY_PORT} (requires X-API-Key header)"
+echo "  - vLLM Server: http://localhost:${VLLM_PORT} (internal only)"
+echo "========================================="
 
-# Wait for the vLLM server process to complete
-# This keeps the container running and passes signals to the server
-wait "$VLLM_PID"
+# Wait for either process to complete
+# This keeps the container running and passes signals to both services
+wait -n "$VLLM_PID" "$GATEWAY_PID"
+
+# If we get here, one of the processes has exited
+echo "[Startup] ERROR: A service has exited unexpectedly!"
+exit 1
