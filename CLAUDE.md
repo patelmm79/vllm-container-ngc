@@ -18,6 +18,7 @@ The `config.env` file contains:
 - `SERVICE_NAME`: Cloud Run service name
 - `ARTIFACT_REGISTRY_REPO`: Artifact Registry repository name
 - `ARTIFACT_REGISTRY_IMAGE`: Container image name
+- `LABEL_APPLICATION`, `LABEL_ENVIRONMENT`, `LABEL_TEAM`, `LABEL_COST_CENTER`: Google Cloud labels for cost tracking
 
 This configuration is loaded by:
 - Dockerfile (during build to download the correct model)
@@ -158,6 +159,7 @@ The container serves the model via vLLM's OpenAI-compatible API with these defau
 - Max instances: 10
 - CPU boost enabled for faster cold starts
 - Startup probe: HTTP health check on `/health` endpoint (60 attempts × 10s = 10 minute timeout)
+- Labels: `application`, `environment`, `team`, `cost-center` (configured in `config.env` for cost tracking)
 
 ## API Key Setup and Management
 
@@ -343,6 +345,65 @@ When `VLLM_TORCH_COMPILE_LEVEL > 0`, the container implements runtime pre-warmin
 - Hugging Face token is handled securely via Google Secret Manager
 - Container runs offline at runtime to prevent unauthorized Hub access
 - Model weights are cached during build to avoid runtime downloads
+
+## Cost Tracking with Google Cloud Labels
+
+The project uses Google Cloud labels to enable cost allocation and tracking at the application level. Labels are applied to both Cloud Run services and Cloud Build jobs.
+
+### Label Configuration
+
+Labels are configured in `config.env` and automatically applied during deployment:
+
+```bash
+LABEL_APPLICATION=vllm-inference
+LABEL_ENVIRONMENT=production
+LABEL_TEAM=ml-platform
+LABEL_COST_CENTER=engineering
+```
+
+**Label naming rules:**
+- Must be lowercase
+- Start with a letter
+- Can contain letters, numbers, underscores, and hyphens
+- Maximum 63 characters
+
+### Where Labels Are Applied
+
+1. **Cloud Run Service** (`cloudbuild.yaml` deploy step):
+   - Labels are automatically applied to the Cloud Run service during deployment
+   - Used for tracking runtime costs (CPU, memory, GPU, networking)
+
+2. **Cloud Build Jobs** (`cloudbuild.yaml` tags):
+   - Tags are applied to Cloud Build jobs for tracking build costs
+   - Currently static tags (vllm-inference, ml-platform, production)
+
+### Viewing Costs by Label
+
+After deployment, you can view costs filtered by labels in Google Cloud Console:
+
+1. **Cloud Console Billing**: Navigate to Billing → Reports
+2. **Filter by labels**: Use the label filters to view costs by application, environment, team, or cost center
+3. **BigQuery**: Export billing data to BigQuery and query by labels for detailed analysis
+
+**Example BigQuery query:**
+```sql
+SELECT
+  labels.value AS application,
+  SUM(cost) AS total_cost
+FROM `project.dataset.gcp_billing_export_v1_XXXXX`,
+  UNNEST(labels) AS labels
+WHERE labels.key = "application"
+  AND labels.value = "vllm-inference"
+GROUP BY application
+```
+
+### Customizing Labels
+
+To modify labels for your organization:
+
+1. Edit the label values in `config.env`
+2. Rebuild and redeploy: `gcloud builds submit --config cloudbuild.yaml`
+3. The new labels will be applied to the Cloud Run service
 
 ## Changing Models
 

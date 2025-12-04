@@ -13,6 +13,10 @@ steps:
         grep "^SERVICE_NAME=" config.env > /workspace/build_config.env
         grep "^ARTIFACT_REGISTRY_REPO=" config.env >> /workspace/build_config.env
         grep "^ARTIFACT_REGISTRY_IMAGE=" config.env >> /workspace/build_config.env
+        grep "^LABEL_APPLICATION=" config.env >> /workspace/build_config.env
+        grep "^LABEL_ENVIRONMENT=" config.env >> /workspace/build_config.env
+        grep "^LABEL_TEAM=" config.env >> /workspace/build_config.env
+        grep "^LABEL_COST_CENTER=" config.env >> /workspace/build_config.env
         cat /workspace/build_config.env
 
 - name: 'gcr.io/cloud-builders/docker'
@@ -74,7 +78,8 @@ steps:
           --cpu-boost \
           --port=8080 \
           --startup-probe=httpGet.path=/health,httpGet.port=8080,initialDelaySeconds=30,periodSeconds=10,timeoutSeconds=10,failureThreshold=30 \
-          --set-env-vars="GCP_PROJECT=${PROJECT_ID},API_KEYS_SECRET_NAME=vllm-api-keys"
+          --set-env-vars="GCP_PROJECT=${PROJECT_ID},API_KEYS_SECRET_NAME=vllm-api-keys" \
+          --labels="application=$$LABEL_APPLICATION,environment=$$LABEL_ENVIRONMENT,team=$$LABEL_TEAM,cost-center=$$LABEL_COST_CENTER"
 
 - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk:slim'
   id: test
@@ -101,3 +106,11 @@ options:
   machineType: "E2_HIGHCPU_8"
   diskSizeGb: 200
   logging: CLOUD_LOGGING_ONLY
+
+# Labels for Cloud Build job (for cost tracking)
+# Note: These are static labels. To use dynamic labels from config.env,
+# you would need to use substitutions or a wrapper script.
+tags:
+  - vllm-inference
+  - ml-platform
+  - production
