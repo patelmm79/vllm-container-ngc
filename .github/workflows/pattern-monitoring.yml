@@ -1,0 +1,15 @@
+name: Pattern Monitoring
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  workflow_dispatch:  # Allow manual triggering
+
+jobs:
+  analyze:
+    uses: patelmm79/architecture-kb/.github/workflows/analyze-reusable.yml@main
+    secrets:
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      ORCHESTRATOR_URL: ${{ secrets.ORCHESTRATOR_URL }}
