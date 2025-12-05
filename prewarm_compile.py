@@ -16,8 +16,6 @@ import time
 import requests
 from typing import List
 
-
-
 # Configuration
 # MODEL_REPO is the Hugging Face model identifier
 # This is loaded from config.env via entrypoint.sh
