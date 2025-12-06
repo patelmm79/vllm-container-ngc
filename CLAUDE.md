@@ -143,6 +143,7 @@ The container serves the model via vLLM's OpenAI-compatible API with these defau
 - API Gateway Port: 8000 (exposed to Cloud Run, requires API key authentication)
 - vLLM Server Port: 8080 (internal only, proxied by API gateway)
 - Model: `deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B` (1.5B parameters)
+- Trust remote code: enabled (required for DeepSeek-R1-Distill models due to custom tokenizer configs)
 - Data type: float16 (configured in `entrypoint.sh`)
 - GPU memory utilization: 0.95
 - Max concurrent sequences: 8

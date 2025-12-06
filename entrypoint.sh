@@ -102,6 +102,7 @@ echo "[Startup] Starting vLLM server on internal port ${VLLM_PORT}..."
 python3 -m vllm.entrypoints.openai.api_server \
     --port ${VLLM_PORT} \
     --model ${MODEL_PATH} \
+    --trust-remote-code \
     --gpu-memory-utilization 0.95 \
     --dtype float16 \
     --max-num-seqs 8 \
