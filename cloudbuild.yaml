@@ -76,8 +76,8 @@ steps:
           --min-instances=1 \
           --max-instances=3 \
           --cpu-boost \
-          --port=8080 \
-          --startup-probe=httpGet.path=/health,httpGet.port=8080,initialDelaySeconds=30,periodSeconds=10,timeoutSeconds=10,failureThreshold=30 \
+          --port=8000 \
+          --startup-probe=httpGet.path=/health,httpGet.port=8000,initialDelaySeconds=30,periodSeconds=10,timeoutSeconds=10,failureThreshold=30 \
           --set-env-vars="GCP_PROJECT=${PROJECT_ID},API_KEYS_SECRET_NAME=vllm-api-keys" \
           --labels="application=$$LABEL_APPLICATION,environment=$$LABEL_ENVIRONMENT,team=$$LABEL_TEAM,cost-center=$$LABEL_COST_CENTER"
 

@@ -116,7 +116,7 @@ Configuration is centralized in `config.env`. The following environment variable
 - `HF_HOME`: Model cache directory (`/model-cache`)
 - `HF_TOKEN`: Required for downloading the model from Hugging Face (Secret Manager)
 - `HF_HUB_OFFLINE`: Set to `1` in final container to prevent runtime Hub access
-- `PORT`: Server port (defaults to 8080 on Cloud Run, 8000 locally)
+- `PORT`: API Gateway port (set to 8000 by Cloud Run, defaults to 8000 locally). vLLM server runs on internal port 8080.
 - `MAX_MODEL_LEN`: Optional model length limit
 - `TORCH_CUDA_ARCH_LIST`: CUDA compute capability for target GPU (default: `7.5` for T4)
   - Set as a build argument in both Dockerfile and Cloud Build configuration
@@ -140,7 +140,8 @@ Configuration is centralized in `config.env`. The following environment variable
 ## Runtime Configuration
 
 The container serves the model via vLLM's OpenAI-compatible API with these defaults:
-- Port: 8000 (configurable via `PORT` env var)
+- API Gateway Port: 8000 (exposed to Cloud Run, requires API key authentication)
+- vLLM Server Port: 8080 (internal only, proxied by API gateway)
 - Model: `deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B` (1.5B parameters)
 - Data type: float16 (configured in `entrypoint.sh`)
 - GPU memory utilization: 0.95
@@ -156,9 +157,10 @@ The container serves the model via vLLM's OpenAI-compatible API with these defau
 - Timeout: 600s
 - Concurrency: 1 (one request per container instance)
 - Min instances: 1 (keeps at least one container warm)
-- Max instances: 10
+- Max instances: 3
 - CPU boost enabled for faster cold starts
-- Startup probe: HTTP health check on `/health` endpoint (60 attempts × 10s = 10 minute timeout)
+- Port: 8000 (API gateway with authentication)
+- Startup probe: HTTP health check on `/health` endpoint on port 8000 (30 attempts × 10s = 5 minute timeout)
 - Labels: `application`, `environment`, `team`, `cost-center` (configured in `config.env` for cost tracking)
 
 ## API Key Setup and Management
