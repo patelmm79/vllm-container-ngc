@@ -22,8 +22,9 @@ from typing import List
 MODEL_REPO = os.environ.get('MODEL_REPO', os.environ.get('MODEL_NAME', 'deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B'))
 # Extract just the model ID (last part after /) for API requests
 MODEL_ID = MODEL_REPO.split('/')[-1] if '/' in MODEL_REPO else MODEL_REPO
-PORT = os.environ.get('PORT', '8000')
-BASE_URL = f"http://localhost:{PORT}"
+# Pre-warming connects directly to vLLM server (internal port 8080), not the API gateway
+VLLM_PORT = os.environ.get('VLLM_PORT', '8080')
+BASE_URL = f"http://localhost:{VLLM_PORT}"
 COMPLETIONS_ENDPOINT = f"{BASE_URL}/v1/completions"
 
 # Common input lengths to pre-warm (in tokens, approximately)
