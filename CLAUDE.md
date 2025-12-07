@@ -157,7 +157,7 @@ The container serves the model via vLLM's OpenAI-compatible API with these defau
 - Execution environment: gen2
 - Timeout: 600s
 - Concurrency: 1 (one request per container instance)
-- Min instances: 1 (keeps at least one container warm)
+- Min instances: 0 (scales to zero when idle to minimize costs)
 - Max instances: 3
 - CPU boost enabled for faster cold starts
 - Port: 8000 (API gateway with authentication)
