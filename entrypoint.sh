@@ -54,6 +54,8 @@ fi
 # Use existing TORCH_CUDA_ARCH_LIST if set, otherwise default to 7.5 for T4 GPUs
 export TORCH_CUDA_ARCH_LIST="${TORCH_CUDA_ARCH_LIST:-7.5}"
 export HF_HUB_OFFLINE="${HF_HUB_OFFLINE:-1}"
+# Ensure torch.compile level is set correctly (from Dockerfile ENV or explicit override)
+export VLLM_TORCH_COMPILE_LEVEL="${VLLM_TORCH_COMPILE_LEVEL:-0}"
 
 # Set MODEL_REPO from config.env or use default
 export MODEL_REPO="${MODEL_NAME:-deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B}"
