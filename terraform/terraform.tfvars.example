@@ -1,0 +1,20 @@
+# Copy this file to terraform.tfvars and fill in your values
+# Values can be derived from config.env
+
+gcp_project              = "your-project-id"
+gcp_region               = "us-central1"
+service_name             = "vllm-qwen-25-3b-instruct"
+artifact_registry_repo   = "vllm-qwen-25-3b-repo"
+artifact_registry_image  = "vllm-qwen-25-3b-instruct"
+api_keys_secret_name     = "vllm-api-keys"
+
+# Optional: customize labels
+label_application = "vllm-inference"
+label_environment = "production"
+label_team        = "ml-platform"
+label_cost_center = "engineering"
+
+# Optional: customize Cloud Run settings
+run_cpu     = "8"
+run_memory  = "32Gi"
+run_timeout = 600
