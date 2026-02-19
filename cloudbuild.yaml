@@ -105,7 +105,7 @@ availableSecrets:
 
 options:
   machineType: "E2_HIGHCPU_8"
-  diskSizeGb: 200
+  diskSizeGb: 500
   logging: CLOUD_LOGGING_ONLY
 
 # Labels for Cloud Build job (for cost tracking)
