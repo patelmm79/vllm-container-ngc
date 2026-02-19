@@ -77,7 +77,6 @@ steps:
           --max-instances=3 \
           --cpu-boost \
           --port=8000 \
-          --allow-unauthenticated \
           --no-gpu-zonal-redundancy \
           --startup-probe=httpGet.path=/health,httpGet.port=8000,initialDelaySeconds=30,periodSeconds=10,timeoutSeconds=10,failureThreshold=30 \
           --set-env-vars="GCP_PROJECT=${PROJECT_ID},API_KEYS_SECRET_NAME=vllm-api-keys" \
