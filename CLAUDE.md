@@ -298,6 +298,78 @@ curl -X GET "${SERVICE_URL}/admin/reload-keys" \
 - All other endpoints require a valid API key
 - Invalid API key attempts are logged for audit purposes
 
+### Cloud Run Authentication (Service Account)
+
+The Cloud Run service requires **two layers of authentication**:
+
+1. **Cloud Run Platform Layer**: Service account token (enforced by Cloud Run)
+2. **API Gateway Layer**: API key header (enforced by the FastAPI gateway)
+
+This defense-in-depth approach ensures only authorized services can access the inference server.
+
+**Authenticating with a service account token:**
+
+```bash
+# Get an identity token for the Cloud Run service
+TOKEN=$(gcloud auth print-identity-token \
+  --audiences=https://vllm-qwen3-4b-instruct-2507-{region}.run.app)
+
+# Make a request with both Cloud Run auth AND API key
+curl -X GET "https://vllm-qwen3-4b-instruct-2507-{region}.run.app/v1/models" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "X-API-Key: sk-your-api-key-here"
+```
+
+**Using Python with service account:**
+
+```python
+from google.auth.transport.requests import Request
+from google.oauth2.service_account import Credentials
+import requests
+
+# Load service account credentials
+credentials = Credentials.from_service_account_file(
+    'path/to/service-account-key.json',
+    scopes=['https://www.googleapis.com/auth/cloud-platform']
+)
+
+# Get ID token for Cloud Run
+credentials.refresh(Request())
+id_token = credentials.token
+
+# Make API request with both auth layers
+headers = {
+    'Authorization': f'Bearer {id_token}',
+    'X-API-Key': 'sk-your-api-key-here',
+    'Content-Type': 'application/json'
+}
+
+response = requests.post(
+    'https://vllm-qwen3-4b-instruct-2507-{region}.run.app/v1/completions',
+    headers=headers,
+    json={
+        'model': 'Qwen/Qwen3-4B-Instruct-2507',
+        'prompt': 'Hello world',
+        'max_tokens': 50
+    }
+)
+print(response.json())
+```
+
+**Granting service account access:**
+
+To allow a specific service account to invoke the Cloud Run service:
+
+```bash
+export PROJECT_ID="your-project-id"
+export INVOKER_SERVICE_ACCOUNT="your-service@${PROJECT_ID}.iam.gserviceaccount.com"
+
+gcloud run services add-iam-policy-binding vllm-qwen3-4b-instruct-2507 \
+  --region us-central1 \
+  --member="serviceAccount:${INVOKER_SERVICE_ACCOUNT}" \
+  --role="roles/run.invoker"
+```
+
 ## torch.compile Configuration
 
 **Current Status**: torch.compile is **disabled by default** (`VLLM_TORCH_COMPILE_LEVEL=0`) to optimize for cold start times.
