@@ -137,30 +137,9 @@ cleanup() {
 # Register cleanup function for common termination signals
 trap cleanup SIGTERM SIGINT SIGQUIT
 
-# Run pre-warming script
-# This script will wait for the server to be ready, then make test requests
-# to trigger torch.compile for common input shapes
+# Start FastAPI API gateway in background BEFORE pre-warming
+# This ensures the startup probe can reach /health on port 8000 immediately
 echo ""
-echo "[Startup] Running pre-warming script..."
-if ! python3 /app/prewarm_compile.py; then
-    echo "[Startup] WARNING: Pre-warming script failed or was skipped"
-    echo "[Startup] Continuing with server startup anyway..."
-fi
-log_timing "Pre-warming script execution"
-
-# Check if vLLM server is still running
-if ! kill -0 "$VLLM_PID" 2>/dev/null; then
-    echo "[Startup] ERROR: vLLM server has stopped unexpectedly!"
-    exit 1
-fi
-
-# Pre-warming complete, now start API gateway in foreground
-echo ""
-echo "[Startup] Pre-warming complete! Starting API gateway..."
-log_timing "Pre-warming complete"
-
-# Start FastAPI API gateway in foreground
-# This will authenticate requests and proxy them to the vLLM server
 echo "[Startup] Starting API gateway on port ${GATEWAY_PORT}..."
 
 # Export environment variables for the API gateway
@@ -174,6 +153,16 @@ GATEWAY_PID=$!
 echo "[Startup] API gateway started with PID: $GATEWAY_PID"
 log_timing "API gateway startup"
 
+# Run pre-warming script in background
+# This script will wait for the vLLM server to be ready, then make test requests
+# to trigger torch.compile for common input shapes
+echo ""
+echo "[Startup] Running pre-warming script in background..."
+python3 /app/prewarm_compile.py &
+PREWARM_PID=$!
+echo "[Startup] Pre-warming script started with PID: $PREWARM_PID"
+log_timing "Pre-warming script startup"
+
 # Print final summary
 echo ""
 echo "========================================="
@@ -186,12 +175,14 @@ echo ""
 echo "[Startup] Container is ready!"
 echo "  - API Gateway: http://0.0.0.0:${GATEWAY_PORT} (requires X-API-Key header)"
 echo "  - vLLM Server: http://localhost:${VLLM_PORT} (internal only)"
+echo "  - Pre-warming: Running in background (PID: $PREWARM_PID)"
 echo "========================================="
 
-# Wait for either process to complete
+# Wait for either vLLM or API gateway to complete
+# Pre-warming runs in background and completes on its own
 # This keeps the container running and passes signals to both services
 wait -n "$VLLM_PID" "$GATEWAY_PID"
 
-# If we get here, one of the processes has exited
+# If we get here, one of the main services has exited
 echo "[Startup] ERROR: A service has exited unexpectedly!"
 exit 1
