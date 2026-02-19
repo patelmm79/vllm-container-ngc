@@ -168,10 +168,11 @@ resource "google_cloud_run_service" "vllm" {
   ]
 }
 
-# Cloud Run IAM - allow unauthenticated access (comment out if you want authenticated-only)
-# resource "google_cloud_run_service_iam_member" "allow_unauthenticated" {
-#   service  = google_cloud_run_service.vllm.name
-#   location = var.gcp_region
-#   role     = "roles/run.invoker"
-#   member   = "principalSet:allUsers"
-# }
+# Cloud Run IAM - allow unauthenticated access
+# Note: API Gateway still requires X-API-Key header for application-level security
+resource "google_cloud_run_service_iam_member" "allow_unauthenticated" {
+  service  = google_cloud_run_service.vllm.name
+  location = var.gcp_region
+  role     = "roles/run.invoker"
+  member   = "principalSet:allUsers"
+}
